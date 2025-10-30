@@ -2,8 +2,10 @@ import os
 import yaml
 
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 
 app = Flask(__name__)
+cors = CORS(app, resources={r"/*": {"origins": "http://localhost:9000"}})
 
 WEATHER_FILE = os.path.join(os.path.dirname(__file__), "open-weather-mini.yaml")
 
