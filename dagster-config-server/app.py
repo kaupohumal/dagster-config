@@ -5,9 +5,10 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 
 app = Flask(__name__)
-cors = CORS(app, resources={r"/*": {"origins": "http://localhost:9000"}})
+cors = CORS(app, resources={r"/*": {"origins": "*"}})
 
-WEATHER_FILE = os.path.join(os.path.dirname(__file__), "open-weather-mini.yaml")
+# YAML_FILE = os.path.join(os.path.dirname(__file__), "bus_validations.yaml")
+YAML_FILE = os.path.join(os.path.dirname(__file__), "/home/kaupo/kool/thesis/dagster/dagster-user-code/jobs/bus_validations.yaml")
 
 def set_units(config: dict, new_units: str) -> int:
     updated = 0
@@ -56,7 +57,7 @@ def update_units():
         }), 400
 
     try:
-        data = load_config(WEATHER_FILE)
+        data = load_config(YAML_FILE)
     except FileNotFoundError as e:
         return jsonify({"ok": False, "error": str(e)}), 404
     except Exception as e:
@@ -64,7 +65,7 @@ def update_units():
 
     try:
         updated = set_units(data, units)
-        save_config(WEATHER_FILE, data)
+        save_config(YAML_FILE, data)
     except Exception as e:
         return jsonify({"ok": False, "error": f"Failed to update YAML: {e}"}), 500
 
@@ -72,5 +73,37 @@ def update_units():
         "ok": True,
         "units": units,
         "updated": updated,
-        "file": os.path.basename(WEATHER_FILE),
+        "file": os.path.basename(YAML_FILE),
     }), 200
+
+@app.post("/config")
+def update_config():
+    payload = request.get_json(silent=True) or {}
+    print(payload)
+
+    try:
+        data = load_config(YAML_FILE)
+    except FileNotFoundError as e:
+        return jsonify({"ok": False, "error": str(e)}), 404
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Failed to read YAML: {e}"}), 500
+
+    http_asset = next(
+        asset
+        for job in data.get("jobs", [])
+        for asset in job.get("assets", [])
+        if asset.get("module") == "http_get"
+    )
+
+    current_endpoint = http_asset["params"]["endpoint"]
+    print("current endpoint:", current_endpoint)
+
+    http_asset["params"]["endpoint"] = payload.get("sourceApiUrl")
+
+    try:
+        save_config(YAML_FILE, data)
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Failed to update YAML: {e}"}), 500
+
+
+    return payload
