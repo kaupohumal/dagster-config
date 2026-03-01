@@ -1,15 +1,27 @@
-import type { RouteRecordRaw } from 'vue-router';
+import type {RouteRecordRaw} from 'vue-router';
 
 const routes: RouteRecordRaw[] = [
   {
     path: '/',
     component: () => import('layouts/MainLayout.vue'),
-    children: [{ path: '', component: () => import('pages/IndexPage.vue') }],
+    children: [{path: '', component: () => import('pages/IndexPage.vue')}],
   },
-    {
-    path: '/pipeline',
+  {
+    path: '/pipelines',
     component: () => import('layouts/MainLayout.vue'),
-    children: [{ path: '', component: () => import('pages/PipelinePage.vue') }],
+    children: [
+      {
+        path: '',
+        name: 'pipelinesList',
+        component: () => import('pages/PipelinesPage.vue')
+      },
+      {
+        path: ':pipelineName',
+        name: 'pipelineDetails',
+        component: () => import('pages/PipelinePage.vue')
+      },
+
+    ],
   },
 
   // Always leave this as last one,
