@@ -1,7 +1,11 @@
 <template>
   <q-page class="q-pa-xl">
 
-    <div class="row q-gutter-x-xl">
+    <div class="text-h4">Pipeline: {{route.params.pipelineName}}</div>
+
+
+    <div class="text-h5 q-mt-xl q-ml-xs">Modules:</div>
+    <div class="row q-gutter-x-md q-mt-lg q-ml-xs">
       <div
         class="col"
         v-for="moduleName in moduleNames"

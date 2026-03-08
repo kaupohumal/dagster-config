@@ -1,5 +1,5 @@
 <template>
-  <div class="text-h6">Mappings</div>
+  <div class="text-h6">json_mapper</div>
   <div
     v-for="(mapping, index) in mappings"
     :key="index"

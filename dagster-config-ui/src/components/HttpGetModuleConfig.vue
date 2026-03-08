@@ -1,5 +1,5 @@
 <template>
-  <div class="text-h6 q-mb-lg">Timeseries-db1 API Config</div>
+  <div class="text-h6 q-mb-lg">http_get</div>
   <q-input
     label="URL"
     v-model="timeseriesApiEndpoint"

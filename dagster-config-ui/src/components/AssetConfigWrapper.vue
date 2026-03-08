@@ -6,32 +6,32 @@
   <!--    :options="assetOptions"-->
   <!--  />-->
 
-  <div
+  <q-card
     v-if="assetName === AssetName.Timeseries"
-    class="q-mt-xl"
+    class="q-pa-xs"
   >
-    <SmartCityApiConfig/>
-  </div>
+    <HttpGetModuleConfig/>
+  </q-card>
 
-  <div
+  <q-card
     v-if="assetName === AssetName.Mapper"
-    class="q-mt-xl"
+    class="q-pa-xs"
   >
     <JsonMapperConfig/>
-  </div>
+  </q-card>
 
-  <div
+  <q-card
     v-if="assetName === AssetName.CsvWriter"
-    class="q-mt-xl"
+    class="q-pa-xs"
   >
     <CsvWriterConfig/>
-  </div>
+  </q-card>
 
 </template>
 
 <script setup lang="ts">
 
-import SmartCityApiConfig from "components/SmartCityApiConfig.vue";
+import HttpGetModuleConfig from "components/HttpGetModuleConfig.vue";
 import JsonMapperConfig from "components/JsonMapperConfig.vue";
 import CsvWriterConfig from "components/CsvWriterConfig.vue";
 import {AssetName, type AssetName as AssetNameType} from "components/models";

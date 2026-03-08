@@ -1,6 +1,6 @@
 <template>
 
-  <div class="text-h6">CSV Writer Config</div>
+  <div class="text-h6">write_to_csv</div>
   <q-input
     label="File name"
     v-model="fileName"
