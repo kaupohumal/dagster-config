@@ -31,15 +31,17 @@
 <script setup lang="ts">
 import {ref} from 'vue';
 import {api} from "boot/axios";
+import {useRoute} from "vue-router";
 
 const timeseriesApiEndpoint = ref<string>('https://timeseries-db1.cloud.ut.ee/event');
 const eventType = ref<string>('ridango_validations');
 const pageSize = ref<number>(50);
 const currentPage = ref<number>(1);
+const route = useRoute();
 
 const applyConfig = async () => {
-  await api.patch('/assets/http_get', { //TODO: fix endpoint naming
-    'timeseriesApiEndpoint': timeseriesApiEndpoint.value,
+  await api.patch(`pipelines/${route.params.pipelineName as string}/modules/http_get`, {
+    'endpoint': timeseriesApiEndpoint.value,
     'eventType': eventType.value,
     'pageSize': pageSize.value,
     'currentPage': currentPage.value,
@@ -47,4 +49,5 @@ const applyConfig = async () => {
 }
 
 //TODO: read current data from api
+//TODO: params based on source api type
 </script>

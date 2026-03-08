@@ -47,11 +47,14 @@
 import {ref} from "vue";
 import type {Mapping} from "components/models";
 import {api} from "boot/axios";
+import {useRoute} from "vue-router";
+
+const route = useRoute();
 
 const mappings = ref<Mapping[]>([{source: 'events[*].device_identity', target: 'device_identity'}]);
 
 const applyConfig = async () => {
-  await api.patch('/assets/json_mapper', {
+  await api.patch(`pipelines/${route.params.pipelineName as string}/modules/json_mapper`, {
     'mappings': mappings.value,
   });
 }

@@ -17,11 +17,14 @@
 
 import {ref} from "vue";
 import {api} from "boot/axios";
+import {useRoute} from "vue-router";
+
+const route = useRoute();
 
 const fileName = ref<string>('bus_validations.csv')
 
 const applyConfig = async () => {
-  await api.patch('/assets/write_to_csv', {
+  await api.patch(`pipelines/${route.params.pipelineName as string}/modules/write_to_csv`, {
     'fileName': fileName.value
   });
 }

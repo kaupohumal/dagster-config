@@ -38,12 +38,12 @@ def get_pipeline_modules(pipeline_name: str):
 
 
 # TODO: specify job
-@api.patch("/assets/<module_name>")
-def update_config(module_name: str):
+@api.patch("/pipelines/<pipeline_name>/modules/<module_name>")
+def update_config(pipeline_name: str, module_name: str):
     payload = request.get_json(silent=True) or {}
 
     try:
-        resp = update_job_config(module_name, payload)
+        resp = update_job_config(pipeline_name, module_name, payload)
     except FileNotFoundError as e:
         return jsonify({"ok": False, "error": str(e)}), 404
     except ValueError as e:
