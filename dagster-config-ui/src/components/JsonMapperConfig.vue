@@ -44,17 +44,40 @@
 
 <script setup lang="ts">
 
-import {ref} from "vue";
+import {onMounted, ref} from "vue";
 import type {Mapping} from "components/models";
 import {api} from "boot/axios";
 import {useRoute} from "vue-router";
 
 const route = useRoute();
 
-const mappings = ref<Mapping[]>([{source: 'events[*].device_identity', target: 'device_identity'}]);
+const apiEndpoint: string = `pipelines/${route.params.pipelineName as string}/modules/json_mapper`;
+const mappings = ref<Mapping[]>([]);
+
+onMounted(async () => {
+  await getModuleConfig()
+})
+
+const normalizeMappings = (raw: unknown): Mapping[] => {
+  if (!Array.isArray(raw)) return [{ source: '', target: '' }];
+
+  const normalized: Mapping[] = raw
+    .filter((m): m is Record<string, unknown> => typeof m === 'object' && m !== null)
+    .map((m) => ({
+      source: typeof m.source === 'string' ? m.source : '',
+      target: typeof m.target === 'string' ? m.target : '',
+    }));
+
+  return normalized.length > 0 ? normalized : [{ source: '', target: '' }];
+}
+
+const getModuleConfig = async () => {
+  const res = await api.get(apiEndpoint);
+  mappings.value = normalizeMappings(res.data?.mappings);
+}
 
 const applyConfig = async () => {
-  await api.patch(`pipelines/${route.params.pipelineName as string}/modules/json_mapper`, {
+  await api.patch(apiEndpoint, {
     'mappings': mappings.value,
   });
 }

@@ -44,7 +44,7 @@ def _update_write_to_csv(data: dict[str, Any], payload: dict[str, Any]) -> None:
         asset.setdefault("params", {})["file_name"] = payload.get("fileName")
 
 
-def update_job_config(pipeline_name: str, module_name: str, payload: dict[str, Any]) -> dict[str, Any]:
+def update_module_config(pipeline_name: str, module_name: str, payload: dict[str, Any]) -> dict[str, Any]:
 
     jobs_dir = "/home/kaupo/kool/thesis/dagster/dagster-user-code/jobs/" #TODO
     yaml_file = jobs_dir + pipeline_name + '.yaml'

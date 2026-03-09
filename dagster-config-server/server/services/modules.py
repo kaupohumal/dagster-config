@@ -3,29 +3,16 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from .assets import find_asset_by_module
 from .pipelines import PIPELINES_DIR
 from .yaml_loader import load_config
 
 
 def list_module_names_for_pipeline(pipeline_name: str, pipelines_dir: str = PIPELINES_DIR) -> list[str]:
-    """Return all module names from the given pipeline YAML.
-
-    Args:
-        pipeline_name: YAML name without extension (e.g. "bus_validations").
-        pipelines_dir: Directory containing YAML files.
-
-    Returns:
-        Sorted list of unique module names found under config.jobs[*].assets[*].module.
-
-    Raises:
-        ValueError: invalid pipeline_name.
-        FileNotFoundError: YAML file doesn't exist.
-    """
 
     if not isinstance(pipeline_name, str) or not pipeline_name.strip():
         raise ValueError("pipeline_name must be a non-empty string")
 
-    # Prevent path traversal like "../../etc/passwd".
     name = pipeline_name.strip()
     if "/" in name or "\\" in name or name.startswith("."):
         raise ValueError("Invalid pipeline name")
@@ -46,3 +33,109 @@ def list_module_names_for_pipeline(pipeline_name: str, pipelines_dir: str = PIPE
 
     return sorted(modules)
 
+
+def _validate_pipeline_name(pipeline_name: str) -> str:
+    if not isinstance(pipeline_name, str) or not pipeline_name.strip():
+        raise ValueError("pipeline_name must be a non-empty string")
+
+    name = pipeline_name.strip()
+    if "/" in name or "\\" in name or name.startswith("."):
+        raise ValueError("Invalid pipeline name")
+
+    return name
+
+
+def get_http_get_data(pipeline_name: str, pipelines_dir: str = PIPELINES_DIR) -> dict[str, Any]:
+
+    name = _validate_pipeline_name(pipeline_name)
+    yaml_path = str(Path(pipelines_dir) / f"{name}.yaml")
+    config = load_config(yaml_path)
+
+    asset = find_asset_by_module(config, "http_get")
+    if not asset:
+        raise LookupError("No asset with module 'http_get' found.")
+
+    params = asset.get("params") if isinstance(asset, dict) else None
+    if not isinstance(params, dict):
+        params = {}
+
+    endpoint = params.get("endpoint")
+
+    nested_params = params.get("params")
+    if not isinstance(nested_params, dict):
+        nested_params = {}
+
+    event_type = nested_params.get("event_type")
+    page_size = nested_params.get("page_size")
+    current_page = nested_params.get("current_page")
+
+    return {
+        "module": "http_get",
+        "endpoint": endpoint,
+        "eventType": event_type,
+        "pageSize": page_size,
+        "currentPage": current_page,
+    }
+
+
+def get_json_mapper_data(pipeline_name: str, pipelines_dir: str = PIPELINES_DIR) -> dict[str, Any]:
+    name = _validate_pipeline_name(pipeline_name)
+    yaml_path = str(Path(pipelines_dir) / f"{name}.yaml")
+    config = load_config(yaml_path)
+
+    asset = find_asset_by_module(config, "json_mapper")
+    if not asset:
+        raise LookupError("No asset with module 'json_mapper' found.")
+
+    params = asset.get("params") if isinstance(asset, dict) else None
+    if not isinstance(params, dict):
+        params = {}
+
+    mappings = params.get("mappings")
+    if not isinstance(mappings, dict):
+        mappings = {}
+
+    mappings_list: list[dict[str, Any]] = []
+    for target, source in mappings.items():
+        mappings_list.append({"source": source, "target": target})
+
+    mappings_list.sort(key=lambda x: (str(x.get("target") or ""), str(x.get("source") or "")))
+
+    return {
+        "module": "json_mapper",
+        "mappings": mappings_list,
+    }
+
+
+def get_write_to_csv_data(pipeline_name: str, pipelines_dir: str = PIPELINES_DIR) -> dict[str, Any]:
+    name = _validate_pipeline_name(pipeline_name)
+    yaml_path = str(Path(pipelines_dir) / f"{name}.yaml")
+    config = load_config(yaml_path)
+
+    asset = find_asset_by_module(config, "write_to_csv")
+    if not asset:
+        raise LookupError("No asset with module 'write_to_csv' found.")
+
+    params = asset.get("params") if isinstance(asset, dict) else None
+    if not isinstance(params, dict):
+        params = {}
+
+    file_name = params.get("file_name")
+
+    return {
+        "module": "write_to_csv",
+        "fileName": file_name,
+    }
+
+
+def get_module_data(pipeline_name: str, module_name: str) -> dict[str, Any]:
+
+    match module_name:
+        case "http_get":
+            return get_http_get_data(pipeline_name)
+        case "json_mapper":
+            return get_json_mapper_data(pipeline_name)
+        case "write_to_csv":
+            return get_write_to_csv_data(pipeline_name)
+        case _:
+            raise ValueError(f"Unsupported module_name: {module_name}")
