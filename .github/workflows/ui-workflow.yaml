@@ -12,9 +12,6 @@ jobs:
   build-docker:
     name: Build and push Docker image
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: dagster-config-ui
     steps:
 
       - name: Checkout
@@ -32,8 +29,7 @@ jobs:
       - name: Build and push Dagster image
         uses: docker/build-push-action@v5
         with:
-          context: .
-          file: ./Dockerfile
+          context: "{{defaultContext}}:dagster-config-ui"
           push: true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/dagster-config-ui:test
