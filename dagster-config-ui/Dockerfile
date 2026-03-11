@@ -2,7 +2,7 @@ FROM node:24.14-alpine3.23 AS build-stage
 
 WORKDIR /usr/src/app
 ENV PROD='true'
-COPY --chown=root:root --chmod=755 ["package.json", "yarn.lock", "/usr/src/app/"]
+COPY --chown=root:root --chmod=755 ["package.json", "yarn.lock", "quasar.config.ts", "index.html", "/usr/src/app/"]
 RUN yarn install
 COPY . .
 RUN yarn run build
