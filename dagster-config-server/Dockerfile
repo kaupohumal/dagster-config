@@ -8,21 +8,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY requirements.txt .
 
-RUN pip install --upgrade pip \
- && pip install --prefix=/install --no-cache-dir -r requirements.txt \
- && pip install --prefix=/install --no-cache-dir gunicorn
+RUN python -m venv /venv \
+ && /venv/bin/pip install --upgrade pip \
+ && /venv/bin/pip install --no-cache-dir -r requirements.txt \
+ && /venv/bin/pip install --no-cache-dir gunicorn
 
 
 FROM python:3.14-slim AS production
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PATH="/install/bin:$PATH" \
-    PYTHONPATH="/install/lib/python3.12/site-packages"
+    PATH="/venv/bin:$PATH"
 
 WORKDIR /app
 
-COPY --from=builder /install /install
+COPY --from=builder /venv /venv
 
 COPY . .
 
@@ -42,4 +42,3 @@ CMD ["sh", "-c", "gunicorn \
       --error-logfile - \
       --timeout 60 \
       app:app"]
-
