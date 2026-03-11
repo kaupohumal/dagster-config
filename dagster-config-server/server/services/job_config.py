@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from .assets import find_asset_by_module, mappings_list_to_dict
@@ -46,7 +47,9 @@ def _update_write_to_csv(data: dict[str, Any], payload: dict[str, Any]) -> None:
 
 def update_module_config(pipeline_name: str, module_name: str, payload: dict[str, Any]) -> dict[str, Any]:
 
-    jobs_dir = "/home/kaupo/kool/thesis/dagster/dagster-user-code/jobs/" #TODO
+    jobs_dir = os.environ.get("JOBS_DIR")
+    if not jobs_dir:
+        raise EnvironmentError("JOBS_DIR environment variable is not set.")
     yaml_file = jobs_dir + pipeline_name + '.yaml'
     data = load_config(yaml_file)
 

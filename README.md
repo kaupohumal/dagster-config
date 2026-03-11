@@ -16,6 +16,9 @@ backend is in the dagster-config-server directory.
 
 ## Backend
 
+First, set the path to the directory containing Dagster job definition yaml files in the .env file.
+Then run:
+
 ```cd dagster-config-server```
 
 ```pip install -r requirements.txt```
