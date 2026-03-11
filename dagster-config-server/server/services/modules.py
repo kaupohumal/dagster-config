@@ -4,11 +4,11 @@ from pathlib import Path
 from typing import Any
 
 from .assets import find_asset_by_module
-from .pipelines import PIPELINES_DIR
+from .config import get_jobs_dir
 from .yaml_loader import load_config
 
 
-def list_module_names_for_pipeline(pipeline_name: str, pipelines_dir: str = PIPELINES_DIR) -> list[str]:
+def list_module_names_for_pipeline(pipeline_name: str, pipelines_dir: str | None = None) -> list[str]:
 
     if not isinstance(pipeline_name, str) or not pipeline_name.strip():
         raise ValueError("pipeline_name must be a non-empty string")
@@ -17,9 +17,8 @@ def list_module_names_for_pipeline(pipeline_name: str, pipelines_dir: str = PIPE
     if "/" in name or "\\" in name or name.startswith("."):
         raise ValueError("Invalid pipeline name")
 
-    yaml_path = str(Path(pipelines_dir) / f"{name}.yaml")
+    yaml_path = str(Path(pipelines_dir or get_jobs_dir()) / f"{name}.yaml")
     config = load_config(yaml_path)
-
     modules: set[str] = set()
     for job in config.get("jobs", []) or []:
         if not isinstance(job, dict):
@@ -45,10 +44,9 @@ def _validate_pipeline_name(pipeline_name: str) -> str:
     return name
 
 
-def get_http_get_data(pipeline_name: str, pipelines_dir: str = PIPELINES_DIR) -> dict[str, Any]:
-
+def get_http_get_data(pipeline_name: str, pipelines_dir: str | None = None) -> dict[str, Any]:
     name = _validate_pipeline_name(pipeline_name)
-    yaml_path = str(Path(pipelines_dir) / f"{name}.yaml")
+    yaml_path = str(Path(pipelines_dir or get_jobs_dir()) / f"{name}.yaml")
     config = load_config(yaml_path)
 
     asset = find_asset_by_module(config, "http_get")
@@ -78,9 +76,9 @@ def get_http_get_data(pipeline_name: str, pipelines_dir: str = PIPELINES_DIR) ->
     }
 
 
-def get_json_mapper_data(pipeline_name: str, pipelines_dir: str = PIPELINES_DIR) -> dict[str, Any]:
+def get_json_mapper_data(pipeline_name: str, pipelines_dir: str | None = None) -> dict[str, Any]:
     name = _validate_pipeline_name(pipeline_name)
-    yaml_path = str(Path(pipelines_dir) / f"{name}.yaml")
+    yaml_path = str(Path(pipelines_dir or get_jobs_dir()) / f"{name}.yaml")
     config = load_config(yaml_path)
 
     asset = find_asset_by_module(config, "json_mapper")
@@ -107,9 +105,9 @@ def get_json_mapper_data(pipeline_name: str, pipelines_dir: str = PIPELINES_DIR)
     }
 
 
-def get_write_to_csv_data(pipeline_name: str, pipelines_dir: str = PIPELINES_DIR) -> dict[str, Any]:
+def get_write_to_csv_data(pipeline_name: str, pipelines_dir: str | None = None) -> dict[str, Any]:
     name = _validate_pipeline_name(pipeline_name)
-    yaml_path = str(Path(pipelines_dir) / f"{name}.yaml")
+    yaml_path = str(Path(pipelines_dir or get_jobs_dir()) / f"{name}.yaml")
     config = load_config(yaml_path)
 
     asset = find_asset_by_module(config, "write_to_csv")

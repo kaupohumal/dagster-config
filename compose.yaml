@@ -1,0 +1,34 @@
+name: dagster-config-test
+
+services:
+
+  dagster-config-server:
+    container_name: dagster-config-server
+    image: kaupohumal/dagster-config-server:test
+    pull_policy: always
+    restart: on-failure
+    environment:
+      - JOBS_DIR=/app/jobs
+    volumes:
+      - /home/kaupo/kool/thesis/dagster/dagster-user-code/jobs:/app/jobs
+    networks:
+      - dagster-config
+    ports:
+      - "5000:5000"
+
+  dagster-config-ui:
+    container_name: dagster-config-ui
+    image: kaupohumal/dagster-config-ui:test
+    pull_policy: always
+    restart: on-failure
+    networks:
+      - dagster-config
+    ports:
+      - "80:80"
+    depends_on:
+      - dagster-config-server
+
+networks:
+  dagster-config:
+    driver: bridge
+    name: dagster_config

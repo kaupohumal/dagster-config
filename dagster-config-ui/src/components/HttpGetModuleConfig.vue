@@ -61,7 +61,5 @@ const applyConfig = async () => {
     'currentPage': currentPage.value,
   });
 }
-
-//TODO: read current data from api
 //TODO: params based on source api type
 </script>
