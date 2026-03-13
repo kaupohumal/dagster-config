@@ -2,3 +2,4 @@ flask
 pyyaml
 flask-cors
 python-dotenv
+pygit2

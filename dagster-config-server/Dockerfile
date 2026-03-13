@@ -4,6 +4,9 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         gcc \
+        libgit2-dev \
+        libssh2-1-dev \
+        pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
