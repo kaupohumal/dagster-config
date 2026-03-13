@@ -24,7 +24,7 @@ services:
     networks:
       - dagster-config
     ports:
-      - "80:80"
+      - "8090:80"
     depends_on:
       - dagster-config-server
 
