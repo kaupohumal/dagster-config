@@ -4,7 +4,7 @@ from flask import Blueprint, jsonify, request
 
 from .services.job_config import update_module_config
 from .services.modules import list_module_names_for_pipeline
-from .services.pipelines import list_pipeline_names_from_repo
+from .services.pipelines import list_pipeline_names
 from .services.modules import get_module_data as get_module_data_service
 
 api = Blueprint("api", __name__)
@@ -13,7 +13,7 @@ api = Blueprint("api", __name__)
 @api.get("/pipelines")
 def get_pipeline_names():
     try:
-        names = list_pipeline_names_from_repo()
+        names = list_pipeline_names()
     except FileNotFoundError as e:
         return jsonify({"ok": False, "error": str(e)}), 404
     except NotADirectoryError as e:

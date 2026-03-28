@@ -8,14 +8,9 @@ services:
     pull_policy: always
     restart: on-failure
     environment:
-      - GIT_REPO_URL=https://github.com/your-org/dagster-user-code.git
-      - GIT_BRANCH=main
-      - JOBS_SUBDIR=jobs
-      - REPO_WORKDIR=/tmp/dagster-jobs-repo
-      - GIT_AUTHOR_NAME=Dagster Config UI
-      - GIT_AUTHOR_EMAIL=dagster-config-ui@local
-      - GIT_USERNAME=git
-      - GIT_TOKEN=${GIT_TOKEN}
+      - JOBS_DIR=/app/jobs
+    volumes:
+      - /home/kaupo/kool/thesis/dagster/dagster-user-code/jobs:/app/jobs
     networks:
       - dagster-config
     ports:
