@@ -10,7 +10,7 @@ services:
     environment:
       - JOBS_DIR=/app/jobs
     volumes:
-      - /home/kaupo/kool/thesis/dagster/dagster-user-code/jobs:/app/jobs
+      - /mnt/dagster/jobs:/app/jobs
     networks:
       - dagster-config
     ports:
