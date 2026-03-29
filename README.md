@@ -17,6 +17,23 @@ backend is in the dagster-config-server directory.
 ## Backend
 
 First, set the path to the directory containing Dagster job definition yaml files in the .env file.
+Set the Dagster GraphQL endpoint as well.
+
+Example `.env` for `dagster-config-server`:
+
+```bash
+JOBS_DIR=/absolute/path/to/jobs
+DAGSTER_GRAPHQL_URL=http://localhost:3000/graphql
+```
+
+Optional auth for Dagster API:
+
+```bash
+DAGSTER_API_TOKEN=your-token
+DAGSTER_AUTH_HEADER=Authorization
+DAGSTER_AUTH_PREFIX=Bearer
+```
+
 Then run:
 
 ```cd dagster-config-server```
@@ -24,6 +41,14 @@ Then run:
 ```pip install -r requirements.txt```
 
 ```python3 app.py```
+
+To launch a run from backend directly:
+
+```bash
+curl -X POST "http://localhost:5000/pipelines/<pipeline_name>/run" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
 
 ## UI
 
