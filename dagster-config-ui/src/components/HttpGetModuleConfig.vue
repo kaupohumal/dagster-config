@@ -4,20 +4,39 @@
     label="URL"
     v-model="moduleEndpoint"
   />
-  <div class="q-mt-lg text-bold">Params
-    <q-input
-      label="Event type"
-      v-model="eventType"
-    />
-    <q-input
-      label="Page size"
-      v-model="pageSize"
-      type="number"
-    />
-    <q-input
-      label="Current page"
-      v-model="currentPage"
-      type="number"
+  <div class="q-mt-lg">Params</div>
+  <div
+    v-for="(param, index) in params"
+    :key="index"
+    class="row q-gutter-x-xs"
+  >
+    <div class="col">
+      <q-input
+        label="Key"
+        v-model="param.key"
+      />
+    </div>
+    <div class="col">
+      <q-input
+        label="Value"
+        v-model="param.value"
+      />
+    </div>
+    <div class="col-1 flex content-center">
+      <q-btn
+        @click="params.splice(index, 1)"
+        icon="close"
+        color="negative"
+        flat
+      />
+    </div>
+  </div>
+  <div class="col-1">
+    <q-btn
+      @click="params.push(createEmptyPair(PARAMETER_FIELDS))"
+      icon="add"
+      color="primary"
+      class="q-mt-sm"
     />
   </div>
   <q-btn
@@ -32,14 +51,18 @@
 import {onMounted, ref} from 'vue';
 import {api} from "boot/axios";
 import {useRoute} from "vue-router";
+import {
+  createEmptyPair,
+  normalizePairList,
+  PARAMETER_FIELDS,
+  type Parameter,
+} from "components/models";
 
 const route = useRoute();
 
 const apiEndpoint: string = `pipelines/${route.params.pipelineName as string}/modules/http_get`;
 const moduleEndpoint = ref<string|null>(null);
-const eventType = ref<string|null>(null);
-const pageSize = ref<number|null>(null);
-const currentPage = ref<number|null>(null);
+const params = ref<Parameter[]>([createEmptyPair(PARAMETER_FIELDS)]);
 
 onMounted(async () => {
   await getModuleConfig()
@@ -48,18 +71,13 @@ onMounted(async () => {
 const getModuleConfig = async () => {
   const res = await api.get(apiEndpoint);
   moduleEndpoint.value = res.data['endpoint'];
-  eventType.value = res.data['eventType'];
-  pageSize.value = res.data['pageSize'];
-  currentPage.value = res.data['currentPage'];
+  params.value = normalizePairList(res.data?.params, PARAMETER_FIELDS);
 }
 
 const applyConfig = async () => {
   await api.patch(apiEndpoint, {
     'endpoint': moduleEndpoint.value,
-    'eventType': eventType.value,
-    'pageSize': pageSize.value,
-    'currentPage': currentPage.value,
+    'params': params.value,
   });
 }
-//TODO: params based on source api type
 </script>

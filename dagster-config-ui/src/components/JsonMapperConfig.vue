@@ -8,13 +8,13 @@
     <div class="col">
       <q-input
         label="Source"
-        v-model="mapping.source"
+        v-model="mapping.value"
       />
     </div>
     <div class="col">
       <q-input
         label="Target"
-        v-model="mapping.target"
+        v-model="mapping.key"
       />
     </div>
     <div class="col-1 flex content-center">
@@ -28,7 +28,7 @@
   </div>
   <div class="col-1">
     <q-btn
-      @click="mappings.push({source: '', target: ''})"
+      @click="mappings.push(createEmptyPair(MAPPING_FIELDS))"
       icon="add"
       color="primary"
       class="q-mt-sm"
@@ -45,35 +45,27 @@
 <script setup lang="ts">
 
 import {onMounted, ref} from "vue";
-import type {Mapping} from "components/models";
+import {
+  createEmptyPair,
+  MAPPING_FIELDS,
+  normalizePairList,
+  type Mapping,
+} from "components/models";
 import {api} from "boot/axios";
 import {useRoute} from "vue-router";
 
 const route = useRoute();
 
 const apiEndpoint: string = `pipelines/${route.params.pipelineName as string}/modules/json_mapper`;
-const mappings = ref<Mapping[]>([]);
+const mappings = ref<Mapping[]>([createEmptyPair(MAPPING_FIELDS)]);
 
 onMounted(async () => {
   await getModuleConfig()
 })
 
-const normalizeMappings = (raw: unknown): Mapping[] => {
-  if (!Array.isArray(raw)) return [{ source: '', target: '' }];
-
-  const normalized: Mapping[] = raw
-    .filter((m): m is Record<string, unknown> => typeof m === 'object' && m !== null)
-    .map((m) => ({
-      source: typeof m.source === 'string' ? m.source : '',
-      target: typeof m.target === 'string' ? m.target : '',
-    }));
-
-  return normalized.length > 0 ? normalized : [{ source: '', target: '' }];
-}
-
 const getModuleConfig = async () => {
   const res = await api.get(apiEndpoint);
-  mappings.value = normalizeMappings(res.data?.mappings);
+  mappings.value = normalizePairList(res.data?.mappings, MAPPING_FIELDS);
 }
 
 const applyConfig = async () => {

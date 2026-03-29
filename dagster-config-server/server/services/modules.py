@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from .assets import find_asset_by_module
+from .assets import dict_to_pair_list, find_asset_by_module
 from .config import get_jobs_dir
 from .yaml_loader import load_config
 
@@ -60,19 +60,16 @@ def get_http_get_data(pipeline_name: str, pipelines_dir: str | None = None) -> d
     endpoint = params.get("endpoint")
 
     nested_params = params.get("params")
-    if not isinstance(nested_params, dict):
-        nested_params = {}
-
-    event_type = nested_params.get("event_type")
-    page_size = nested_params.get("page_size")
-    current_page = nested_params.get("current_page")
+    params_list = dict_to_pair_list(
+        nested_params,
+        key_field="key",
+        value_field="value",
+    )
 
     return {
         "module": "http_get",
         "endpoint": endpoint,
-        "eventType": event_type,
-        "pageSize": page_size,
-        "currentPage": current_page,
+        "params": params_list,
     }
 
 
@@ -89,15 +86,11 @@ def get_json_mapper_data(pipeline_name: str, pipelines_dir: str | None = None) -
     if not isinstance(params, dict):
         params = {}
 
-    mappings = params.get("mappings")
-    if not isinstance(mappings, dict):
-        mappings = {}
-
-    mappings_list: list[dict[str, Any]] = []
-    for target, source in mappings.items():
-        mappings_list.append({"source": source, "target": target})
-
-    mappings_list.sort(key=lambda x: (str(x.get("target") or ""), str(x.get("source") or "")))
+    mappings_list = dict_to_pair_list(
+        params.get("mappings"),
+        key_field="key",
+        value_field="value",
+    )
 
     return {
         "module": "json_mapper",

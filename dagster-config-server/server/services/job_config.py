@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .assets import find_asset_by_module, mappings_list_to_dict
+from .assets import find_asset_by_module, key_value_list_to_dict, mappings_list_to_dict
 from .config import get_jobs_dir
 from .yaml_loader import load_config, save_config
 
@@ -15,14 +15,9 @@ def _update_http_get(data: dict[str, Any], payload: dict[str, Any]) -> None:
     if "endpoint" in payload:
         asset.setdefault("params", {})["endpoint"] = payload.get("endpoint")
 
-    if "eventType" in payload:
-        asset.setdefault("params", {})["params"]["event_type"] = payload.get("eventType")
-
-    if "pageSize" in payload:
-        asset.setdefault("params", {})["params"]["page_size"] = int(payload.get("pageSize"))
-
-    if "currentPage" in payload:
-        asset.setdefault("params", {})["params"]["current_page"] = int(payload.get("currentPage"))
+    if "params" in payload:
+        new_params = key_value_list_to_dict(payload.get("params"), payload_name="params")
+        asset.setdefault("params", {})["params"] = new_params
 
 
 
