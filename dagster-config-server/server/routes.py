@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from flask import Blueprint, jsonify, request
 
-from .services.dagster_graphql import DagsterGraphQLError, trigger_pipeline_run
+from .services.dagster_graphql import DagsterGraphQLError, get_run_status, trigger_pipeline_run
 from .services.job_config import update_module_config
 from .services.modules import list_module_names_for_pipeline
 from .services.pipelines import list_pipeline_names
@@ -105,4 +105,25 @@ def run_pipeline(pipeline_name: str):
 
     status_code = 200 if result.ok else 400
     return jsonify(result.to_dict()), status_code
+
+
+@api.get("/pipelines/<pipeline_name>/runs/<run_id>/status")
+def get_pipeline_run_status(pipeline_name: str, run_id: str):
+    _ = pipeline_name
+
+    try:
+        result = get_run_status(run_id)
+    except EnvironmentError as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+    except DagsterGraphQLError as e:
+        return jsonify({"ok": False, "error": str(e)}), 502
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Failed to fetch run status: {e}"}), 500
+
+    if result.ok:
+        return jsonify(result.to_dict()), 200
+    if result.error_type == "RunNotFoundError":
+        return jsonify(result.to_dict()), 404
+    return jsonify(result.to_dict()), 502
+
 

@@ -44,6 +44,25 @@ mutation LaunchPipeline($executionParams: ExecutionParams!) {
 """
 
 
+GET_RUN_STATUS_QUERY = """
+query GetRunStatus($runId: ID!) {
+  runOrError(runId: $runId) {
+    __typename
+    ... on Run {
+      runId
+      status
+    }
+    ... on RunNotFoundError {
+      message
+    }
+    ... on PythonError {
+      message
+    }
+  }
+}
+"""
+
+
 @dataclass
 class DagsterRunResult:
     ok: bool
@@ -167,6 +186,27 @@ def trigger_pipeline_run(
         ok=False,
         error_type=typename,
         error=f"Dagster rejected run launch: {typename}",
+    )
+
+
+def get_run_status(run_id: str) -> DagsterRunResult:
+    data = _post_graphql(GET_RUN_STATUS_QUERY, {"runId": run_id})
+    run_or_error = data.get("runOrError") or {}
+    typename = run_or_error.get("__typename", "Unknown")
+
+    if typename == "Run":
+        return DagsterRunResult(
+            ok=True,
+            run_id=run_or_error.get("runId") or run_id,
+            status=run_or_error.get("status"),
+        )
+
+    message = run_or_error.get("message") if isinstance(run_or_error, dict) else None
+    return DagsterRunResult(
+        ok=False,
+        run_id=run_id,
+        error_type=typename,
+        error=message or f"Failed to fetch run status: {typename}",
     )
 
 
