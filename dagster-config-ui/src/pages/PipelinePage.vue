@@ -12,15 +12,6 @@
       />
     </div>
 
-    <q-banner
-      v-if="runMessage"
-      class="q-mt-md"
-      :class="runMessageIsError ? 'bg-red-1 text-red-10' : 'bg-green-1 text-green-10'"
-    >
-      {{ runMessage }}
-    </q-banner>
-
-
     <div class="text-h5 q-mt-xl q-ml-xs">Modules:</div>
     <div class="row q-gutter-x-md q-mt-lg q-ml-xs">
       <div
@@ -45,12 +36,13 @@ import {api} from "boot/axios";
 import AssetConfigWrapper from "components/AssetConfigWrapper.vue";
 import {useRoute} from "vue-router";
 import {parseAssetName, type AssetName} from "components/models";
+import {useQuasar} from "quasar";
+import {getApiErrorMessage} from "../utils/errors";
 
 const route = useRoute();
+const $q = useQuasar();
 const moduleNames = ref<AssetName[]>([]);
 const isLaunching = ref(false);
-const runMessage = ref('');
-const runMessageIsError = ref(false);
 
 onMounted(async () => {
   await getModules();
@@ -66,8 +58,6 @@ const getModules = async () => {
 
 const runPipeline = async () => {
   isLaunching.value = true;
-  runMessage.value = '';
-  runMessageIsError.value = false;
 
   try {
     const pipelineName = route.params.pipelineName as string;
@@ -75,13 +65,19 @@ const runPipeline = async () => {
     const runId = response.data?.runId;
     const status = response.data?.status;
 
-    runMessage.value = runId
+    const message = runId
       ? `Run started successfully (runId: ${runId}, status: ${status ?? 'UNKNOWN'})`
       : 'Run started successfully.';
+
+    $q.notify({
+      type: 'positive',
+      message,
+    });
   } catch (error: unknown) {
-    const message = (error as { response?: { data?: { error?: string } } })?.response?.data?.error;
-    runMessage.value = message || 'Failed to start pipeline run.';
-    runMessageIsError.value = true;
+    $q.notify({
+      type: 'negative',
+      message: getApiErrorMessage(error, 'Failed to start pipeline run.'),
+    });
   } finally {
     isLaunching.value = false;
   }

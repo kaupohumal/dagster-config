@@ -51,14 +51,17 @@
 import {onMounted, ref} from 'vue';
 import {api} from "boot/axios";
 import {useRoute} from "vue-router";
+import {useQuasar} from "quasar";
 import {
   createEmptyPair,
   normalizePairList,
   PARAMETER_FIELDS,
   type Parameter,
 } from "components/models";
+import {getApiErrorMessage} from "../utils/errors";
 
 const route = useRoute();
+const $q = useQuasar();
 
 const apiEndpoint: string = `pipelines/${route.params.pipelineName as string}/modules/http_get`;
 const moduleEndpoint = ref<string|null>(null);
@@ -75,9 +78,21 @@ const getModuleConfig = async () => {
 }
 
 const applyConfig = async () => {
-  await api.patch(apiEndpoint, {
-    'endpoint': moduleEndpoint.value,
-    'params': params.value,
-  });
+  try {
+    await api.patch(apiEndpoint, {
+      'endpoint': moduleEndpoint.value,
+      'params': params.value,
+    });
+
+    $q.notify({
+      type: 'positive',
+      message: 'Saved http_get module changes.',
+    });
+  } catch (error: unknown) {
+    $q.notify({
+      type: 'negative',
+      message: getApiErrorMessage(error, 'Failed to save http_get module changes.'),
+    });
+  }
 }
 </script>

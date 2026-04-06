@@ -53,8 +53,11 @@ import {
 } from "components/models";
 import {api} from "boot/axios";
 import {useRoute} from "vue-router";
+import {useQuasar} from "quasar";
+import {getApiErrorMessage} from "../utils/errors";
 
 const route = useRoute();
+const $q = useQuasar();
 
 const apiEndpoint: string = `pipelines/${route.params.pipelineName as string}/modules/json_mapper`;
 const mappings = ref<Mapping[]>([createEmptyPair(MAPPING_FIELDS)]);
@@ -69,9 +72,21 @@ const getModuleConfig = async () => {
 }
 
 const applyConfig = async () => {
-  await api.patch(apiEndpoint, {
-    'mappings': mappings.value,
-  });
+  try {
+    await api.patch(apiEndpoint, {
+      'mappings': mappings.value,
+    });
+
+    $q.notify({
+      type: 'positive',
+      message: 'Saved json_mapper module changes.',
+    });
+  } catch (error: unknown) {
+    $q.notify({
+      type: 'negative',
+      message: getApiErrorMessage(error, 'Failed to save json_mapper module changes.'),
+    });
+  }
 }
 
 </script>
