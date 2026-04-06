@@ -17,6 +17,21 @@ def get_dagster_graphql_url() -> str:
     return dagster_graphql_url
 
 
+def get_dagster_ui_base_url() -> str | None:
+    dagster_ui_base_url = os.environ.get("DAGSTER_UI_BASE_URL")
+    if dagster_ui_base_url:
+        return dagster_ui_base_url.rstrip("/")
+
+    dagster_graphql_url = os.environ.get("DAGSTER_GRAPHQL_URL")
+    if not dagster_graphql_url:
+        return None
+
+    normalized_graphql_url = dagster_graphql_url.rstrip("/")
+    if normalized_graphql_url.endswith("/graphql"):
+        return normalized_graphql_url[: -len("/graphql")]
+    return normalized_graphql_url
+
+
 def get_dagster_auth_header() -> tuple[str, str] | None:
     token = os.environ.get("DAGSTER_API_TOKEN")
     if not token:

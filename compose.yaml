@@ -10,6 +10,7 @@ services:
     environment:
       - JOBS_DIR=/app/jobs
       - DAGSTER_GRAPHQL_URL=http://docker_webserver:3000/graphql
+      - DAGSTER_UI_BASE_URL=http://localhost:3000
       - HOME=/home/appuser
       - XDG_CACHE_HOME=/home/appuser/.cache
     volumes:

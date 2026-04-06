@@ -24,7 +24,10 @@ Example `.env` for `dagster-config-server`:
 ```bash
 JOBS_DIR=/absolute/path/to/jobs
 DAGSTER_GRAPHQL_URL=http://localhost:3000/graphql
+DAGSTER_UI_BASE_URL=http://localhost:3000
 ```
+
+`DAGSTER_UI_BASE_URL` is optional. If omitted, backend derives it from `DAGSTER_GRAPHQL_URL` by removing `/graphql`. Set it explicitly when UI and GraphQL hosts differ.
 
 Optional auth for Dagster API:
 

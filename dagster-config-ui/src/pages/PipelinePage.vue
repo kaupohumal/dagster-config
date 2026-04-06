@@ -16,6 +16,18 @@
       <q-badge :color="runStatusColor" text-color="white" class="q-px-sm q-py-xs">
         Run {{ activeRunId }}: {{ runStatus ?? 'UNKNOWN' }}
       </q-badge>
+      <q-btn
+        v-if="activeRunUrl"
+        flat
+        dense
+        no-caps
+        color="primary"
+        icon="open_in_new"
+        label="Open in Dagster"
+        :href="activeRunUrl"
+        target="_blank"
+        rel="noopener noreferrer"
+      />
       <q-spinner-dots
         v-if="isPollingStatus && !isTerminalStatus(runStatus)"
         color="primary"
@@ -58,6 +70,7 @@ const $q = useQuasar();
 const moduleNames = ref<AssetName[]>([]);
 const isLaunching = ref(false);
 const activeRunId = ref<string | null>(null);
+const activeRunUrl = ref<string | null>(null);
 const runStatus = ref<string | null>(null);
 const statusError = ref<string | null>(null);
 const isPollingStatus = ref(false);
@@ -117,8 +130,10 @@ const fetchRunStatus = async () => {
     const pipelineName = route.params.pipelineName as string;
     const response = await api.get(`/pipelines/${pipelineName}/runs/${activeRunId.value}/status`);
     const status = response.data?.status;
+    const runUrl = response.data?.runUrl;
 
     runStatus.value = typeof status === "string" ? status : null;
+    activeRunUrl.value = typeof runUrl === "string" && runUrl.length > 0 ? runUrl : activeRunUrl.value;
     statusError.value = null;
 
     if (isTerminalStatus(runStatus.value)) {
@@ -150,6 +165,7 @@ const runPipeline = async () => {
     const response = await api.post(`/pipelines/${pipelineName}/run`, {});
     const runId = response.data?.runId;
     const status = response.data?.status;
+    const runUrl = response.data?.runUrl;
 
     const message = runId
       ? `Run started successfully (runId: ${runId}, status: ${status ?? 'UNKNOWN'})`
@@ -162,6 +178,7 @@ const runPipeline = async () => {
 
     if (typeof runId === "string" && runId.length > 0) {
       activeRunId.value = runId;
+      activeRunUrl.value = typeof runUrl === "string" && runUrl.length > 0 ? runUrl : null;
       runStatus.value = typeof status === "string" ? status : null;
       statusError.value = null;
 

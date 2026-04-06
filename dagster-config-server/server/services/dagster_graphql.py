@@ -6,7 +6,7 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from .config import get_dagster_auth_header, get_dagster_graphql_url
+from .config import get_dagster_auth_header, get_dagster_graphql_url, get_dagster_ui_base_url
 
 
 FIND_PIPELINE_SELECTOR_QUERY = """
@@ -68,6 +68,7 @@ class DagsterRunResult:
     ok: bool
     run_id: str | None = None
     status: str | None = None
+    run_url: str | None = None
     error_type: str | None = None
     error: str | None = None
 
@@ -76,6 +77,7 @@ class DagsterRunResult:
             "ok": self.ok,
             "runId": self.run_id,
             "status": self.status,
+            "runUrl": self.run_url,
             "errorType": self.error_type,
             "error": self.error,
         }
@@ -83,6 +85,15 @@ class DagsterRunResult:
 
 class DagsterGraphQLError(Exception):
     pass
+
+
+def _build_run_url(run_id: str | None) -> str | None:
+    if not run_id:
+        return None
+    ui_base_url = get_dagster_ui_base_url()
+    if not ui_base_url:
+        return None
+    return f"{ui_base_url}/runs/{run_id}"
 
 
 def _post_graphql(query: str, variables: dict[str, Any]) -> dict[str, Any]:
@@ -180,7 +191,13 @@ def trigger_pipeline_run(
 
     if typename == "LaunchRunSuccess":
         run = launch_result.get("run") or {}
-        return DagsterRunResult(ok=True, run_id=run.get("runId"), status=run.get("status"))
+        run_id = run.get("runId")
+        return DagsterRunResult(
+            ok=True,
+            run_id=run_id,
+            status=run.get("status"),
+            run_url=_build_run_url(run_id),
+        )
 
     return DagsterRunResult(
         ok=False,
@@ -195,16 +212,19 @@ def get_run_status(run_id: str) -> DagsterRunResult:
     typename = run_or_error.get("__typename", "Unknown")
 
     if typename == "Run":
+        resolved_run_id = run_or_error.get("runId") or run_id
         return DagsterRunResult(
             ok=True,
-            run_id=run_or_error.get("runId") or run_id,
+            run_id=resolved_run_id,
             status=run_or_error.get("status"),
+            run_url=_build_run_url(resolved_run_id),
         )
 
     message = run_or_error.get("message") if isinstance(run_or_error, dict) else None
     return DagsterRunResult(
         ok=False,
         run_id=run_id,
+        run_url=_build_run_url(run_id),
         error_type=typename,
         error=message or f"Failed to fetch run status: {typename}",
     )
