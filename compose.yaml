@@ -9,10 +9,13 @@ services:
     restart: on-failure
     environment:
       - JOBS_DIR=/app/jobs
+      - DAGSTER_GRAPHQL_URL=http://docker_webserver:3000/graphql
+      - HOME=/home/appuser
+      - XDG_CACHE_HOME=/home/appuser/.cache
     volumes:
       - /mnt/dagster/jobs:/app/jobs
     networks:
-      - dagster-config
+      - dagster_network
     ports:
       - "5000:5000"
 
@@ -22,13 +25,14 @@ services:
     pull_policy: always
     restart: on-failure
     networks:
-      - dagster-config
+      - dagster_network
     ports:
       - "8090:80"
     depends_on:
       - dagster-config-server
 
 networks:
-  dagster-config:
+  dagster_network:
     driver: bridge
-    name: dagster_config
+    name: dagster_network
+    external: true

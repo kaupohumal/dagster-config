@@ -18,7 +18,9 @@ FROM python:3.14-slim AS production
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PATH="/venv/bin:$PATH"
+    PATH="/venv/bin:$PATH" \
+    HOME="/home/appuser" \
+    XDG_CACHE_HOME="/home/appuser/.cache"
 
 WORKDIR /app
 
@@ -26,8 +28,10 @@ COPY --from=builder /venv /venv
 
 COPY . .
 
-RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser \
- && chown -R appuser:appgroup /app
+RUN addgroup --system appgroup \
+ && adduser --system --home /home/appuser --ingroup appgroup appuser \
+ && mkdir -p /home/appuser/.cache \
+ && chown -R appuser:appgroup /app /home/appuser
 
 USER appuser
 
