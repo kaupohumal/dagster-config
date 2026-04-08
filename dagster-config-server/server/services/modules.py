@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from .assets import dict_to_pair_list, find_asset_by_module
+from .assets import dict_to_pair_list, find_asset_by_module, find_resource_by_type
 from .config import get_jobs_dir
 from .yaml_loader import load_config
 
@@ -28,7 +28,7 @@ def list_module_names_for_pipeline(pipeline_name: str, pipelines_dir: str | None
                 continue
             module = asset.get("module")
             if isinstance(module, str) and module.strip():
-                modules.add(module)
+                modules.add(module.strip())
 
     return sorted(modules)
 
@@ -119,6 +119,54 @@ def get_write_to_csv_data(pipeline_name: str, pipelines_dir: str | None = None) 
     }
 
 
+def get_transform_to_arcgis_format_data(
+    pipeline_name: str, pipelines_dir: str | None = None
+) -> dict[str, Any]:
+    name = _validate_pipeline_name(pipeline_name)
+    yaml_path = str(Path(pipelines_dir or get_jobs_dir()) / f"{name}.yaml")
+    config = load_config(yaml_path)
+
+    asset = find_asset_by_module(config, "transform_to_arcgis_format")
+    if not asset:
+        raise LookupError("No asset with module 'transform_to_arcgis_format' found.")
+
+    params = asset.get("params") if isinstance(asset, dict) else None
+    if not isinstance(params, dict):
+        params = {}
+
+    return {
+        "module": "transform_to_arcgis_format",
+        "lat": params.get("lat"),
+        "lng": params.get("lng"),
+    }
+
+
+def get_send_to_arcgis_data(pipeline_name: str, pipelines_dir: str | None = None) -> dict[str, Any]:
+    name = _validate_pipeline_name(pipeline_name)
+    yaml_path = str(Path(pipelines_dir or get_jobs_dir()) / f"{name}.yaml")
+    config = load_config(yaml_path)
+
+    asset = find_asset_by_module(config, "send_to_arcgis")
+    if not asset:
+        raise LookupError("No asset with module 'send_to_arcgis' found.")
+
+    params = asset.get("params") if isinstance(asset, dict) else None
+    if not isinstance(params, dict):
+        params = {}
+
+    resource = find_resource_by_type(config, "ArcGIS")
+    resource_params = resource.get("params") if isinstance(resource, dict) else None
+    if not isinstance(resource_params, dict):
+        resource_params = {}
+
+    return {
+        "module": "send_to_arcgis",
+        "layerName": params.get("layer_name"),
+        "sublayerName": params.get("sublayer_name"),
+        "featureServiceAddress": resource_params.get("feature_service_address"),
+    }
+
+
 def get_module_data(pipeline_name: str, module_name: str) -> dict[str, Any]:
 
     match module_name:
@@ -128,5 +176,9 @@ def get_module_data(pipeline_name: str, module_name: str) -> dict[str, Any]:
             return get_json_mapper_data(pipeline_name)
         case "write_to_csv":
             return get_write_to_csv_data(pipeline_name)
+        case "transform_to_arcgis_format":
+            return get_transform_to_arcgis_format_data(pipeline_name)
+        case "send_to_arcgis":
+            return get_send_to_arcgis_data(pipeline_name)
         case _:
             raise ValueError(f"Unsupported module_name: {module_name}")

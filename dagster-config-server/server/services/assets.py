@@ -12,6 +12,14 @@ def find_asset_by_module(config: dict[str, Any], module_name: str) -> dict[str, 
     return None
 
 
+def find_resource_by_type(config: dict[str, Any], resource_type: str) -> dict[str, Any] | None:
+
+    for resource in config.get("resources", []) or []:
+        if isinstance(resource, dict) and resource.get("resource") == resource_type:
+            return resource
+    return None
+
+
 def pair_list_to_dict(
     pair_list: object,
     *,

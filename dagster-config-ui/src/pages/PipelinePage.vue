@@ -42,11 +42,11 @@
     <div class="row q-gutter-x-md q-mt-lg q-ml-xs">
       <div
         class="col"
-        v-for="moduleName in moduleNames"
-        :key="moduleName"
+        v-for="(moduleName, index) in moduleNames"
+        :key="`${moduleName}-${index}`"
       >
         <AssetConfigWrapper
-          :assetName="moduleName"
+          :asset-name="moduleName"
         />
       </div>
 
@@ -61,13 +61,12 @@ import {computed, onBeforeUnmount, onMounted, ref} from 'vue';
 import {api} from "boot/axios";
 import AssetConfigWrapper from "components/AssetConfigWrapper.vue";
 import {useRoute} from "vue-router";
-import {parseAssetName, type AssetName} from "components/models";
 import {useQuasar} from "quasar";
 import {getApiErrorMessage} from "../utils/errors";
 
 const route = useRoute();
 const $q = useQuasar();
-const moduleNames = ref<AssetName[]>([]);
+const moduleNames = ref<string[]>([]);
 const isLaunching = ref(false);
 const activeRunId = ref<string | null>(null);
 const activeRunUrl = ref<string | null>(null);
@@ -102,10 +101,13 @@ onBeforeUnmount(() => {
 
 const getModules = async () => {
   const res = await api.get(`pipelines/${route.params.pipelineName as string}/modules`);
-  const raw = Array.isArray(res.data) ? res.data : [];
+  const raw: unknown[] = Array.isArray(res.data)
+    ? res.data
+    : (Array.isArray(res.data?.modules) ? res.data.modules : []);
+
   moduleNames.value = raw
-    .map(parseAssetName)
-    .filter((v): v is AssetName => v !== null);
+    .filter((v: unknown): v is string => typeof v === 'string' && v.trim().length > 0)
+    .map((v: string) => v.trim());
 };
 
 const isTerminalStatus = (status: string | null) => {

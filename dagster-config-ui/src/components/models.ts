@@ -45,6 +45,8 @@ export const AssetName = {
   Timeseries: 'http_get',
   Mapper: 'json_mapper',
   CsvWriter: 'write_to_csv',
+  TransformToArcgisFormat: 'transform_to_arcgis_format',
+  SendToArcgis: 'send_to_arcgis',
 } as const;
 
 export type AssetName = (typeof AssetName)[keyof typeof AssetName];
@@ -53,12 +55,50 @@ export const assetNameOptions: AssetName[] = [
   AssetName.Timeseries,
   AssetName.Mapper,
   AssetName.CsvWriter,
+  AssetName.TransformToArcgisFormat,
+  AssetName.SendToArcgis,
 ];
 
+function normalizeAssetName(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+
+  const withoutControlChars = Array.from(value)
+    .filter((char) => {
+      const code = char.charCodeAt(0);
+      return !(code <= 31 || code === 127);
+    })
+    .join('');
+
+  const normalized = value
+    .trim()
+    .replace(/^['"]+|['"]+$/g, '')
+    .toLowerCase()
+    .replace(/-/g, '_')
+    .replace(/\s+/g, '');
+  const cleaned = withoutControlChars
+    .trim()
+    .replace(/^['"]+|['"]+$/g, '')
+    .toLowerCase()
+    .replace(/-/g, '_')
+    .replace(/\s+/g, '');
+
+  return cleaned.length > 0 ? cleaned : (normalized.length > 0 ? normalized : null);
+}
+
 export function isAssetName(value: unknown): value is AssetName {
-  return typeof value === 'string' && (assetNameOptions as readonly string[]).includes(value);
+  const normalized = normalizeAssetName(value);
+  if (!normalized) return false;
+
+  return (assetNameOptions as readonly string[]).includes(normalized);
 }
 
 export function parseAssetName(value: unknown): AssetName | null {
-  return isAssetName(value) ? value : null;
+  const normalized = normalizeAssetName(value);
+  if (!normalized) return null;
+
+  if ((assetNameOptions as readonly string[]).includes(normalized)) {
+    return normalized as AssetName;
+  }
+
+  return null;
 }
