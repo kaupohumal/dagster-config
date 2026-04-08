@@ -1,11 +1,43 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
 from .assets import dict_to_pair_list, find_asset_by_module, find_resource_by_type
 from .config import get_jobs_dir
 from .yaml_loader import load_config
+
+
+class ModuleEntry(TypedDict):
+    name: str
+    asset: str | None
+    ins: str | list[str] | dict[str, Any] | None
+    index: int
+
+
+def _list_module_entries_for_pipeline_config(config: dict[str, Any]) -> list[ModuleEntry]:
+    entries: list[ModuleEntry] = []
+
+    for job in config.get("jobs", []) or []:
+        if not isinstance(job, dict):
+            continue
+        for asset in job.get("assets", []) or []:
+            if not isinstance(asset, dict):
+                continue
+            module = asset.get("module")
+            if not isinstance(module, str) or not module.strip():
+                continue
+
+            entries.append(
+                {
+                    "name": module.strip(),
+                    "asset": asset.get("asset") if isinstance(asset.get("asset"), str) else None,
+                    "ins": asset.get("ins"),
+                    "index": len(entries),
+                }
+            )
+
+    return entries
 
 
 def list_module_names_for_pipeline(pipeline_name: str, pipelines_dir: str | None = None) -> list[str]:
@@ -19,18 +51,17 @@ def list_module_names_for_pipeline(pipeline_name: str, pipelines_dir: str | None
 
     yaml_path = str(Path(pipelines_dir or get_jobs_dir()) / f"{name}.yaml")
     config = load_config(yaml_path)
-    modules: set[str] = set()
-    for job in config.get("jobs", []) or []:
-        if not isinstance(job, dict):
-            continue
-        for asset in job.get("assets", []) or []:
-            if not isinstance(asset, dict):
-                continue
-            module = asset.get("module")
-            if isinstance(module, str) and module.strip():
-                modules.add(module.strip())
 
-    return sorted(modules)
+    ordered_modules: list[str] = []
+    seen_modules: set[str] = set()
+    for entry in _list_module_entries_for_pipeline_config(config):
+        module_name = entry["name"]
+        if module_name in seen_modules:
+            continue
+        ordered_modules.append(module_name)
+        seen_modules.add(module_name)
+
+    return ordered_modules
 
 
 def _validate_pipeline_name(pipeline_name: str) -> str:
