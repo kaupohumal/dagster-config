@@ -1,40 +1,42 @@
 <template>
-  <div class="text-h6">transform_to_arcgis_format</div>
-  <q-checkbox
-    v-model="renameCoordinates"
-    class="q-mt-sm"
-  >
-    <template #default>
-      Rename latitude and longitude keys
-      <q-icon
-        name="help_outline"
-        size="18px"
-        color="grey-7"
-        class="cursor-pointer q-ml-xs"
-      >
-        <q-tooltip>
-          If the source data uses some other values than "lat" and "lng", add those values here.
-        </q-tooltip>
-      </q-icon>
-    </template>
-  </q-checkbox>
-  <q-input
-    v-if="renameCoordinates"
-    label="Latitude field (lat)"
-    v-model="lat"
-  />
-  <q-input
-    v-if="renameCoordinates"
-    class="q-mt-sm"
-    label="Longitude field (lng)"
-    v-model="lng"
-  />
-  <q-btn
-    @click="applyConfig"
-    label="Save"
-    class="q-mt-md"
-    color="primary"
-  />
+  <div class="module-config">
+    <div class="text-h6">transform_to_arcgis_format</div>
+    <q-checkbox
+      v-model="renameCoordinates"
+      class="q-mt-sm"
+    >
+      <template #default>
+        Rename latitude and longitude keys
+        <q-icon
+          name="help_outline"
+          size="18px"
+          color="grey-7"
+          class="cursor-pointer q-ml-xs"
+        >
+          <q-tooltip>
+            If the source data uses some other values than "lat" and "lng", add those values here.
+          </q-tooltip>
+        </q-icon>
+      </template>
+    </q-checkbox>
+    <q-input
+      v-if="renameCoordinates"
+      label="Latitude field (lat)"
+      v-model="lat"
+    />
+    <q-input
+      v-if="renameCoordinates"
+      class="q-mt-sm"
+      label="Longitude field (lng)"
+      v-model="lng"
+    />
+    <q-btn
+      @click="applyConfig"
+      label="Save"
+      class="module-save-btn"
+      color="primary"
+    />
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -94,4 +96,18 @@ const applyConfig = async () => {
 };
 
 </script>
+
+<style scoped>
+.module-config {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 100%;
+}
+
+.module-save-btn {
+  margin-top: auto;
+  align-self: flex-end;
+}
+</style>
 

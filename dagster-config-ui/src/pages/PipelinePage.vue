@@ -39,17 +39,25 @@
     </div>
 
     <div class="text-h5 q-mt-xl q-ml-xs">Modules:</div>
-    <div class="row q-gutter-x-md q-mt-lg q-ml-xs">
-      <div
-        class="col"
-        v-for="(moduleName, index) in moduleNames"
-        :key="`${moduleName}-${index}`"
-      >
-        <AssetConfigWrapper
-          :asset-name="moduleName"
-        />
-      </div>
-
+    <div class="pipeline-flow q-mt-lg q-ml-xs" :style="flowStyle">
+      <template v-for="(moduleName, index) in moduleNames" :key="`${moduleName}-${index}`">
+        <div
+          class="pipeline-flow-item"
+          :ref="setFlowItemRef"
+        >
+          <AssetConfigWrapper
+            :asset-name="moduleName"
+          />
+        </div>
+        <div
+          v-if="index < moduleNames.length - 1"
+          :key="`${moduleName}-${index}-arrow`"
+          class="pipeline-flow-arrow"
+          aria-hidden="true"
+        >
+          <q-icon name="east" size="20px"/>
+        </div>
+      </template>
     </div>
 
   </q-page>
@@ -57,7 +65,7 @@
 
 <script setup lang="ts">
 
-import {computed, onBeforeUnmount, onMounted, ref} from 'vue';
+import {computed, nextTick, onBeforeUnmount, onBeforeUpdate, onMounted, ref, watch, type ComponentPublicInstance} from 'vue';
 import {api} from "boot/axios";
 import AssetConfigWrapper from "components/AssetConfigWrapper.vue";
 import {useRoute} from "vue-router";
@@ -73,10 +81,22 @@ const activeRunUrl = ref<string | null>(null);
 const runStatus = ref<string | null>(null);
 const statusError = ref<string | null>(null);
 const isPollingStatus = ref(false);
+const flowItemRefs = ref<HTMLElement[]>([]);
+const maxCardHeight = ref<number | null>(null);
 
 const TERMINAL_STATUSES = new Set(["SUCCESS", "FAILURE", "CANCELED", "CANCELING"]);
 const STATUS_POLL_INTERVAL_MS = 3000;
 let statusPollTimer: ReturnType<typeof setInterval> | null = null;
+let cardResizeObserver: ResizeObserver | null = null;
+
+const flowStyle = computed(() => {
+  if (maxCardHeight.value === null) {
+    return {};
+  }
+  return {
+    '--pipeline-card-max-height': `${maxCardHeight.value}px`,
+  };
+});
 
 const runStatusColor = computed(() => {
   if (runStatus.value === "SUCCESS") {
@@ -93,10 +113,24 @@ const runStatusColor = computed(() => {
 
 onMounted(async () => {
   await getModules();
+  await nextTick();
+  observeCards();
+  recomputeMaxCardHeight();
 });
 
 onBeforeUnmount(() => {
   stopStatusPolling();
+  cardResizeObserver?.disconnect();
+});
+
+onBeforeUpdate(() => {
+  flowItemRefs.value = [];
+});
+
+watch(moduleNames, async () => {
+  await nextTick();
+  observeCards();
+  recomputeMaxCardHeight();
 });
 
 const getModules = async () => {
@@ -200,4 +234,96 @@ const runPipeline = async () => {
   }
 };
 
+const setFlowItemRef = (refEl: Element | ComponentPublicInstance | null) => {
+  const el = refEl instanceof HTMLElement
+    ? refEl
+    : (refEl && '$el' in refEl && refEl.$el instanceof HTMLElement ? refEl.$el : null);
+
+  if (el) {
+    flowItemRefs.value.push(el);
+  }
+};
+
+const recomputeMaxCardHeight = () => {
+  let maxHeight = 0;
+
+  for (const item of flowItemRefs.value) {
+    const card = item.querySelector('.q-card');
+    if (!(card instanceof HTMLElement)) {
+      continue;
+    }
+    maxHeight = Math.max(maxHeight, Math.ceil(card.getBoundingClientRect().height));
+  }
+
+  maxCardHeight.value = maxHeight > 0 ? maxHeight : null;
+};
+
+const observeCards = () => {
+  cardResizeObserver?.disconnect();
+
+  if (typeof ResizeObserver === 'undefined') {
+    return;
+  }
+
+  cardResizeObserver = new ResizeObserver(() => {
+    recomputeMaxCardHeight();
+  });
+
+  for (const item of flowItemRefs.value) {
+    const card = item.querySelector('.q-card');
+    if (card instanceof HTMLElement) {
+      cardResizeObserver.observe(card);
+    }
+  }
+};
+
 </script>
+
+<style scoped>
+.pipeline-flow {
+  --pipeline-card-max-height: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 16px;
+}
+
+.pipeline-flow-item {
+  flex: 1 1 340px;
+  min-width: 320px;
+  max-width: 460px;
+}
+
+.pipeline-flow-item :deep(.q-card) {
+  min-height: var(--pipeline-card-max-height, auto);
+  min-width: 0;
+}
+
+.pipeline-flow-item :deep(.text-h6) {
+  overflow-wrap: anywhere;
+}
+
+.pipeline-flow-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  color: var(--q-primary);
+  min-height: var(--pipeline-card-max-height, auto);
+  width: 20px;
+}
+
+@media (max-width: 1023px) {
+  .pipeline-flow-item {
+    flex: 1 1 100%;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .pipeline-flow-arrow {
+    justify-content: center;
+    margin-top: 10px;
+  }
+}
+</style>
+

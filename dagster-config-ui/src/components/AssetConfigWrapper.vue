@@ -1,35 +1,35 @@
 <template>
   <q-card
     v-if="parsedAssetName === AssetName.Timeseries"
-    class="q-pa-xs"
+    class="q-pa-xs module-card"
   >
     <HttpGetModuleConfig/>
   </q-card>
 
   <q-card
     v-if="parsedAssetName === AssetName.Mapper"
-    class="q-pa-xs"
+    class="q-pa-xs module-card"
   >
     <JsonMapperConfig/>
   </q-card>
 
   <q-card
     v-if="parsedAssetName === AssetName.CsvWriter"
-    class="q-pa-xs"
+    class="q-pa-xs module-card"
   >
     <CsvWriterConfig/>
   </q-card>
 
   <q-card
     v-if="parsedAssetName === AssetName.TransformToArcgisFormat"
-    class="q-pa-xs"
+    class="q-pa-xs module-card"
   >
     <TransformToArcgisFormatConfig/>
   </q-card>
 
   <q-card
     v-if="parsedAssetName === AssetName.SendToArcgis"
-    class="q-pa-xs"
+    class="q-pa-xs module-card"
   >
     <SendToArcgisConfig/>
   </q-card>
@@ -62,3 +62,23 @@ const props = defineProps<{
 const parsedAssetName = computed(() => parseAssetName(props.assetName));
 
 </script>
+
+<style scoped>
+.module-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.module-card :deep(.module-config) {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 100%;
+}
+
+.module-card :deep(.module-save-btn) {
+  margin-top: auto;
+  align-self: flex-end;
+}
+</style>
+

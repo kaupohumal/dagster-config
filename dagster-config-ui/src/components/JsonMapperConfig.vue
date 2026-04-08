@@ -1,45 +1,48 @@
 <template>
-  <div class="text-h6">json_mapper</div>
-  <div
-    v-for="(mapping, index) in mappings"
-    :key="index"
-    class="row q-gutter-x-lg"
-  >
-    <div class="col">
-      <q-input
-        label="Source"
-        v-model="mapping.value"
-      />
+  <div class="module-config">
+    <div class="text-h6">json_mapper</div>
+    <div
+      v-for="(mapping, index) in mappings"
+      :key="index"
+      class="pair-row"
+    >
+      <div class="pair-field">
+        <q-input
+          label="Source"
+          v-model="mapping.value"
+        />
+      </div>
+      <div class="pair-field">
+        <q-input
+          label="Target"
+          v-model="mapping.key"
+        />
+      </div>
+      <div class="pair-action">
+        <q-btn
+          @click="mappings.splice(index, 1)"
+          icon="close"
+          color="negative"
+          dense
+          flat
+        />
+      </div>
     </div>
-    <div class="col">
-      <q-input
-        label="Target"
-        v-model="mapping.key"
-      />
-    </div>
-    <div class="col-1 flex content-center">
+    <div>
       <q-btn
-        @click="mappings.splice(index, 1)"
-        icon="close"
-        color="negative"
-        flat
+        @click="mappings.push(createEmptyPair(MAPPING_FIELDS))"
+        icon="add"
+        color="primary"
+        class="q-mt-sm"
       />
     </div>
-  </div>
-  <div class="col-1">
     <q-btn
-      @click="mappings.push(createEmptyPair(MAPPING_FIELDS))"
-      icon="add"
+      @click="applyConfig"
+      label="Save"
+      class="module-save-btn"
       color="primary"
-      class="q-mt-sm"
     />
   </div>
-  <q-btn
-    @click="applyConfig"
-    label="Save"
-    class="q-mt-md"
-    color="primary"
-  />
 </template>
 
 <script setup lang="ts">
@@ -90,3 +93,35 @@ const applyConfig = async () => {
 }
 
 </script>
+
+<style scoped>
+.module-config {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 100%;
+}
+
+.pair-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-top: 8px;
+}
+
+.pair-field {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.pair-action {
+  flex: 0 0 auto;
+  padding-top: 10px;
+}
+
+.module-save-btn {
+  margin-top: auto;
+  align-self: flex-end;
+}
+</style>
+

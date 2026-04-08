@@ -1,25 +1,27 @@
 <template>
-  <div class="text-h6">send_to_arcgis</div>
-  <q-input
-    class="q-mt-sm"
-    label="Feature service address"
-    v-model="featureServiceAddress"
-  />
-  <q-input
-    label="Layer name"
-    v-model="layerName"
-  />
-  <q-input
-    class="q-mt-sm"
-    label="Sublayer name"
-    v-model="sublayerName"
-  />
-  <q-btn
-    @click="applyConfig"
-    label="Save"
-    class="q-mt-md"
-    color="primary"
-  />
+  <div class="module-config">
+    <div class="text-h6">send_to_arcgis</div>
+    <q-input
+      class="q-mt-sm"
+      label="Feature service address"
+      v-model="featureServiceAddress"
+    />
+    <q-input
+      label="Layer name"
+      v-model="layerName"
+    />
+    <q-input
+      class="q-mt-sm"
+      label="Sublayer name"
+      v-model="sublayerName"
+    />
+    <q-btn
+      @click="applyConfig"
+      label="Save"
+      class="module-save-btn"
+      color="primary"
+    />
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -72,4 +74,18 @@ const applyConfig = async () => {
 };
 
 </script>
+
+<style scoped>
+.module-config {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 100%;
+}
+
+.module-save-btn {
+  margin-top: auto;
+  align-self: flex-end;
+}
+</style>
 
