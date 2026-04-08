@@ -7,6 +7,7 @@ from .services.job_config import update_module_config
 from .services.modules import list_module_names_for_pipeline
 from .services.pipelines import list_pipeline_names
 from .services.modules import get_module_data as get_module_data_service
+from .services.run_config import apply_arcgis_resource_config
 
 api = Blueprint("api", __name__)
 
@@ -80,6 +81,18 @@ def run_pipeline(pipeline_name: str):
     run_config_data = payload.get("runConfigData") if isinstance(payload, dict) else None
     if run_config_data is not None and not isinstance(run_config_data, dict):
         return jsonify({"ok": False, "error": "runConfigData must be an object."}), 400
+
+    try:
+        run_config_data = apply_arcgis_resource_config(
+            pipeline_name=pipeline_name,
+            run_config_data=run_config_data,
+        )
+    except FileNotFoundError as e:
+        return jsonify({"ok": False, "error": str(e)}), 404
+    except LookupError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
 
     raw_tags = payload.get("tags") if isinstance(payload, dict) else None
     if raw_tags is not None and not isinstance(raw_tags, dict):

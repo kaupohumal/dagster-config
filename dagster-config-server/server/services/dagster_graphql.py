@@ -39,6 +39,23 @@ mutation LaunchPipeline($executionParams: ExecutionParams!) {
         status
       }
     }
+    ... on RunConfigValidationInvalid {
+      errors {
+        __typename
+        message
+        reason
+      }
+    }
+    ... on PipelineConfigValidationInvalid {
+      errors {
+        __typename
+        message
+        reason
+      }
+    }
+    ... on PythonError {
+      message
+    }
   }
 }
 """
@@ -170,6 +187,25 @@ def _resolve_pipeline_selector(pipeline_name: str) -> dict[str, str]:
     return matches[0]
 
 
+def _extract_launch_error_message(launch_result: dict[str, Any], typename: str) -> str:
+    message = launch_result.get("message") if isinstance(launch_result.get("message"), str) else None
+    errors = launch_result.get("errors") if isinstance(launch_result.get("errors"), list) else []
+
+    detailed_errors: list[str] = []
+    for error in errors:
+        if not isinstance(error, dict):
+            continue
+        error_message = error.get("message")
+        if isinstance(error_message, str) and error_message.strip():
+            detailed_errors.append(error_message.strip())
+
+    if detailed_errors:
+        return f"Dagster rejected run launch: {typename}. " + " | ".join(detailed_errors)
+    if message:
+        return f"Dagster rejected run launch: {typename}. {message}"
+    return f"Dagster rejected run launch: {typename}"
+
+
 def trigger_pipeline_run(
     pipeline_name: str,
     run_config_data: dict[str, Any] | None = None,
@@ -202,7 +238,7 @@ def trigger_pipeline_run(
     return DagsterRunResult(
         ok=False,
         error_type=typename,
-        error=f"Dagster rejected run launch: {typename}",
+        error=_extract_launch_error_message(launch_result, typename),
     )
 
 
@@ -228,5 +264,3 @@ def get_run_status(run_id: str) -> DagsterRunResult:
         error_type=typename,
         error=message or f"Failed to fetch run status: {typename}",
     )
-
-
