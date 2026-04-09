@@ -1,6 +1,5 @@
 <template>
   <div class="module-config">
-    <div class="text-h6">send_to_arcgis</div>
     <q-input
       class="q-mt-sm"
       label="Feature service address"

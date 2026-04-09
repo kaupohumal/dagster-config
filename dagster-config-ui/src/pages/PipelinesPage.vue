@@ -89,7 +89,7 @@ const moduleSelections = ref<string[]>([]);
 
 const moduleOptions = computed(() =>
   moduleCatalog.value.map((entry) => ({
-    label: `${entry.label} (${entry.module})`,
+    label: entry.label,
     value: entry.module,
   })),
 );

@@ -1,6 +1,5 @@
 <template>
   <div class="module-config">
-    <div class="text-h6">transform_to_arcgis_format</div>
     <q-checkbox
       v-model="renameCoordinates"
       class="q-mt-sm"

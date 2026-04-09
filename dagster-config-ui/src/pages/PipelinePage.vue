@@ -5,7 +5,7 @@
       <div class="text-h4">Pipeline: {{ route.params.pipelineName }}</div>
       <q-btn
         color="primary"
-        label="Run pipeline"
+        label="Run"
         :loading="isLaunching"
         :disable="isLaunching"
         @click="runPipeline"
@@ -38,50 +38,23 @@
       {{ statusError }}
     </div>
 
-    <div class="text-h5 q-mt-xl q-ml-xs">Modules:</div>
-    <div class="pipeline-flow q-mt-lg q-ml-xs" :style="flowStyle">
+    <div class="pipeline-flow q-mt-xl q-ml-xs" :style="flowStyle">
       <template v-for="(moduleEntry, index) in moduleEntries" :key="`${moduleEntry.name}-${moduleEntry.index}`">
         <div
           class="pipeline-flow-item"
           :ref="setFlowItemRef"
         >
-          <div class="row items-center q-gutter-sm q-mb-sm">
-            <q-select
-              dense
-              outlined
-              class="col"
-              :model-value="moduleEntry.name"
-              :options="moduleOptions"
-              :disable="isSwappingByIndex[moduleEntry.index] === true"
-              emit-value
-              map-options
-              @update:model-value="swapModule(moduleEntry.index, $event)"
-            />
-            <q-btn
-              dense
-              flat
-              color="primary"
-              icon="add"
-              :disable="isAddingModule"
-              @click="openAddModuleDialog(moduleEntry.index + 1)"
-            >
-              <q-tooltip>Add module after this</q-tooltip>
-            </q-btn>
-            <q-btn
-              dense
-              flat
-              color="negative"
-              icon="delete"
-              :loading="isRemovingByIndex[moduleEntry.index] === true"
-              :disable="isRemovingByIndex[moduleEntry.index] === true"
-              @click="removeModule(moduleEntry.index)"
-            >
-              <q-tooltip>Remove this module</q-tooltip>
-            </q-btn>
-          </div>
           <AssetConfigWrapper
             :asset-name="moduleEntry.name"
             :module-index="moduleEntry.index"
+            :selected-module="String(moduleEntry.name)"
+            :module-options="moduleOptions"
+            :is-swapping="isSwappingByIndex[moduleEntry.index] === true"
+            :is-removing="isRemovingByIndex[moduleEntry.index] === true"
+            :is-adding="isAddingModule"
+            @swap="swapModule(moduleEntry.index, $event)"
+            @add-after="openAddModuleDialog(moduleEntry.index + 1)"
+            @remove="requestRemoveModule(moduleEntry.index)"
           />
         </div>
         <div
@@ -127,6 +100,26 @@
       </q-card>
     </q-dialog>
 
+    <q-dialog v-model="isRemoveDialogOpen" persistent>
+      <q-card style="min-width: 380px; max-width: 90vw">
+        <q-card-section>
+          <div class="text-h6">Remove module</div>
+        </q-card-section>
+        <q-card-section>
+          Remove module at position {{ pendingRemoveIndex ?? '-' }}?
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat label="Cancel" @click="closeRemoveDialog" />
+          <q-btn
+            color="negative"
+            label="Remove"
+            :loading="pendingRemoveIndex !== null && isRemovingByIndex[pendingRemoveIndex] === true"
+            @click="confirmRemoveModule"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
   </q-page>
 </template>
 
@@ -148,6 +141,8 @@ const moduleCatalog = ref<ModuleCatalogEntry[]>([]);
 const isSwappingByIndex = ref<Record<number, boolean>>({});
 const isRemovingByIndex = ref<Record<number, boolean>>({});
 const isAddDialogOpen = ref(false);
+const isRemoveDialogOpen = ref(false);
+const pendingRemoveIndex = ref<number | null>(null);
 const isAddingModule = ref(false);
 const addInsertIndex = ref(0);
 const addTargetModule = ref('');
@@ -166,7 +161,7 @@ let statusPollTimer: ReturnType<typeof setInterval> | null = null;
 let cardResizeObserver: ResizeObserver | null = null;
 
 const moduleOptions = computed(() => moduleCatalog.value.map((entry) => ({
-  label: `${entry.label} (${entry.module})`,
+  label: entry.label,
   value: entry.module,
 })));
 
@@ -276,8 +271,19 @@ const addModule = async () => {
   }
 };
 
-const removeModule = async (index: number) => {
-  if (!window.confirm(`Remove module at position ${index}?`)) {
+const requestRemoveModule = (index: number) => {
+  pendingRemoveIndex.value = index;
+  isRemoveDialogOpen.value = true;
+};
+
+const closeRemoveDialog = () => {
+  isRemoveDialogOpen.value = false;
+  pendingRemoveIndex.value = null;
+};
+
+const confirmRemoveModule = async () => {
+  const index = pendingRemoveIndex.value;
+  if (index === null) {
     return;
   }
 
@@ -288,6 +294,7 @@ const removeModule = async (index: number) => {
       type: 'positive',
       message: `Removed module at position ${index}.`,
     });
+    closeRemoveDialog();
     await getModules();
   } catch (error: unknown) {
     $q.notify({
@@ -498,9 +505,6 @@ const observeCards = () => {
   min-width: 0;
 }
 
-.pipeline-flow-item :deep(.text-h6) {
-  overflow-wrap: anywhere;
-}
 
 .pipeline-flow-arrow {
   display: flex;

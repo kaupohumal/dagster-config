@@ -1,6 +1,5 @@
 <template>
   <div class="module-config">
-    <div class="text-h6 q-mb-lg">http_get</div>
     <q-input
       label="URL"
       v-model="moduleEndpoint"
