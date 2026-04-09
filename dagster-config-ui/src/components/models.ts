@@ -16,6 +16,33 @@ export const MAPPING_FIELDS = KEY_VALUE_FIELDS;
 export type Parameter = StringPair<typeof PARAMETER_FIELDS.key, typeof PARAMETER_FIELDS.value>;
 export type Mapping = StringPair<typeof MAPPING_FIELDS.key, typeof MAPPING_FIELDS.value>;
 
+export interface ModuleCatalogEntry {
+  module: AssetName;
+  label: string;
+  default_asset: string;
+  default_params: Record<string, unknown>;
+  required_resources: string[];
+}
+
+export interface ModuleEntry {
+  name: string;
+  asset: string | null;
+  ins: string | string[] | Record<string, unknown> | null;
+  index: number;
+}
+
+export interface CreatePipelinePayload {
+  pipelineName: string;
+  modules: Array<string | { module: string; params?: Record<string, unknown> }>;
+  jobName?: string;
+}
+
+export interface SwapModulePayload {
+  targetModule: string;
+  preserveCompatibleParams?: boolean;
+  dryRun?: boolean;
+}
+
 export function createEmptyPair<K extends string, V extends string>(
   fields: PairFieldNames<K, V>,
 ): StringPair<K, V> {

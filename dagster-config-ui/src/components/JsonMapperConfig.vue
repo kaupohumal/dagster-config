@@ -61,8 +61,11 @@ import {getApiErrorMessage} from "../utils/errors";
 
 const route = useRoute();
 const $q = useQuasar();
+const props = defineProps<{
+  moduleIndex: number;
+}>();
 
-const apiEndpoint: string = `pipelines/${route.params.pipelineName as string}/modules/json_mapper`;
+const apiEndpoint: string = `pipelines/${route.params.pipelineName as string}/modules/json_mapper/${props.moduleIndex}`;
 const mappings = ref<Mapping[]>([createEmptyPair(MAPPING_FIELDS)]);
 
 onMounted(async () => {

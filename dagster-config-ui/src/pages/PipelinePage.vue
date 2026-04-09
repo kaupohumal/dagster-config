@@ -40,18 +40,53 @@
 
     <div class="text-h5 q-mt-xl q-ml-xs">Modules:</div>
     <div class="pipeline-flow q-mt-lg q-ml-xs" :style="flowStyle">
-      <template v-for="(moduleName, index) in moduleNames" :key="`${moduleName}-${index}`">
+      <template v-for="(moduleEntry, index) in moduleEntries" :key="`${moduleEntry.name}-${moduleEntry.index}`">
         <div
           class="pipeline-flow-item"
           :ref="setFlowItemRef"
         >
+          <div class="row items-center q-gutter-sm q-mb-sm">
+            <q-select
+              dense
+              outlined
+              class="col"
+              :model-value="moduleEntry.name"
+              :options="moduleOptions"
+              :disable="isSwappingByIndex[moduleEntry.index] === true"
+              emit-value
+              map-options
+              @update:model-value="swapModule(moduleEntry.index, $event)"
+            />
+            <q-btn
+              dense
+              flat
+              color="primary"
+              icon="add"
+              :disable="isAddingModule"
+              @click="openAddModuleDialog(moduleEntry.index + 1)"
+            >
+              <q-tooltip>Add module after this</q-tooltip>
+            </q-btn>
+            <q-btn
+              dense
+              flat
+              color="negative"
+              icon="delete"
+              :loading="isRemovingByIndex[moduleEntry.index] === true"
+              :disable="isRemovingByIndex[moduleEntry.index] === true"
+              @click="removeModule(moduleEntry.index)"
+            >
+              <q-tooltip>Remove this module</q-tooltip>
+            </q-btn>
+          </div>
           <AssetConfigWrapper
-            :asset-name="moduleName"
+            :asset-name="moduleEntry.name"
+            :module-index="moduleEntry.index"
           />
         </div>
         <div
-          v-if="index < moduleNames.length - 1"
-          :key="`${moduleName}-${index}-arrow`"
+          v-if="index < moduleEntries.length - 1"
+          :key="`${moduleEntry.name}-${index}-arrow`"
           class="pipeline-flow-arrow"
           aria-hidden="true"
         >
@@ -59,6 +94,38 @@
         </div>
       </template>
     </div>
+
+    <q-dialog v-model="isAddDialogOpen">
+      <q-card style="min-width: 440px; max-width: 90vw">
+        <q-card-section>
+          <div class="text-h6">Add module</div>
+        </q-card-section>
+
+        <q-card-section class="q-gutter-md">
+          <div class="text-caption text-grey-7">
+            Insert at position {{ addInsertIndex }}
+          </div>
+          <q-select
+            v-model="addTargetModule"
+            :options="moduleOptions"
+            emit-value
+            map-options
+            label="Module"
+          />
+        </q-card-section>
+
+        <q-card-actions align="right">
+          <q-btn flat label="Cancel" @click="isAddDialogOpen = false" />
+          <q-btn
+            color="primary"
+            label="Add"
+            :loading="isAddingModule"
+            :disable="isAddingModule || !addTargetModule"
+            @click="addModule"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
 
   </q-page>
 </template>
@@ -71,10 +138,19 @@ import AssetConfigWrapper from "components/AssetConfigWrapper.vue";
 import {useRoute} from "vue-router";
 import {useQuasar} from "quasar";
 import {getApiErrorMessage} from "../utils/errors";
+import type { ModuleCatalogEntry, ModuleEntry } from 'components/models';
 
 const route = useRoute();
 const $q = useQuasar();
-const moduleNames = ref<string[]>([]);
+const pipelineName = computed(() => route.params.pipelineName as string);
+const moduleEntries = ref<ModuleEntry[]>([]);
+const moduleCatalog = ref<ModuleCatalogEntry[]>([]);
+const isSwappingByIndex = ref<Record<number, boolean>>({});
+const isRemovingByIndex = ref<Record<number, boolean>>({});
+const isAddDialogOpen = ref(false);
+const isAddingModule = ref(false);
+const addInsertIndex = ref(0);
+const addTargetModule = ref('');
 const isLaunching = ref(false);
 const activeRunId = ref<string | null>(null);
 const activeRunUrl = ref<string | null>(null);
@@ -88,6 +164,11 @@ const TERMINAL_STATUSES = new Set(["SUCCESS", "FAILURE", "CANCELED", "CANCELING"
 const STATUS_POLL_INTERVAL_MS = 3000;
 let statusPollTimer: ReturnType<typeof setInterval> | null = null;
 let cardResizeObserver: ResizeObserver | null = null;
+
+const moduleOptions = computed(() => moduleCatalog.value.map((entry) => ({
+  label: `${entry.label} (${entry.module})`,
+  value: entry.module,
+})));
 
 const flowStyle = computed(() => {
   if (maxCardHeight.value === null) {
@@ -112,7 +193,7 @@ const runStatusColor = computed(() => {
 });
 
 onMounted(async () => {
-  await getModules();
+  await Promise.all([getModules(), getModuleCatalog()]);
   await nextTick();
   observeCards();
   recomputeMaxCardHeight();
@@ -127,21 +208,141 @@ onBeforeUpdate(() => {
   flowItemRefs.value = [];
 });
 
-watch(moduleNames, async () => {
+watch(moduleEntries, async () => {
   await nextTick();
   observeCards();
   recomputeMaxCardHeight();
 });
 
 const getModules = async () => {
-  const res = await api.get(`pipelines/${route.params.pipelineName as string}/modules`);
-  const raw: unknown[] = Array.isArray(res.data)
-    ? res.data
-    : (Array.isArray(res.data?.modules) ? res.data.modules : []);
+  const res = await api.get(`pipelines/${pipelineName.value}/module-entries`);
+  const raw: unknown[] = Array.isArray(res.data) ? res.data : [];
 
-  moduleNames.value = raw
-    .filter((v: unknown): v is string => typeof v === 'string' && v.trim().length > 0)
-    .map((v: string) => v.trim());
+  moduleEntries.value = raw.filter((entry: unknown): entry is ModuleEntry => {
+    if (typeof entry !== 'object' || entry === null) {
+      return false;
+    }
+    const typed = entry as { name?: unknown; index?: unknown };
+    return typeof typed.name === 'string' && typeof typed.index === 'number';
+  });
+};
+
+const getModuleCatalog = async () => {
+  const res = await api.get('/module-catalog');
+  const raw = Array.isArray(res.data) ? res.data : [];
+  moduleCatalog.value = raw.filter(
+    (entry: unknown): entry is ModuleCatalogEntry =>
+      typeof entry === 'object'
+      && entry !== null
+      && typeof (entry as { module?: unknown }).module === 'string'
+      && typeof (entry as { label?: unknown }).label === 'string'
+      && typeof (entry as { default_asset?: unknown }).default_asset === 'string'
+      && Array.isArray((entry as { required_resources?: unknown }).required_resources),
+  );
+};
+
+const openAddModuleDialog = (insertIndex: number) => {
+  addInsertIndex.value = insertIndex;
+  addTargetModule.value = moduleCatalog.value.at(0)?.module ?? '';
+  isAddDialogOpen.value = true;
+};
+
+const addModule = async () => {
+  if (!addTargetModule.value) {
+    return;
+  }
+
+  isAddingModule.value = true;
+  try {
+    await api.post(`/pipelines/${pipelineName.value}/assets`, {
+      targetModule: addTargetModule.value,
+      insertIndex: addInsertIndex.value,
+    });
+
+    $q.notify({
+      type: 'positive',
+      message: `Added '${addTargetModule.value}' at position ${addInsertIndex.value}.`,
+    });
+
+    isAddDialogOpen.value = false;
+    await getModules();
+  } catch (error: unknown) {
+    $q.notify({
+      type: 'negative',
+      message: getApiErrorMessage(error, 'Failed to add module.'),
+    });
+  } finally {
+    isAddingModule.value = false;
+  }
+};
+
+const removeModule = async (index: number) => {
+  if (!window.confirm(`Remove module at position ${index}?`)) {
+    return;
+  }
+
+  isRemovingByIndex.value[index] = true;
+  try {
+    await api.delete(`/pipelines/${pipelineName.value}/assets/${index}`);
+    $q.notify({
+      type: 'positive',
+      message: `Removed module at position ${index}.`,
+    });
+    await getModules();
+  } catch (error: unknown) {
+    $q.notify({
+      type: 'negative',
+      message: getApiErrorMessage(error, 'Failed to remove module.'),
+    });
+  } finally {
+    isRemovingByIndex.value[index] = false;
+  }
+};
+
+const swapModule = async (index: number, value: unknown) => {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    return;
+  }
+
+  const targetModule = value.trim();
+  const current = moduleEntries.value.find((entry) => entry.index === index)?.name;
+  if (current === targetModule) {
+    return;
+  }
+
+  if (!targetModule || targetModule.trim().length === 0) {
+    return;
+  }
+
+  isSwappingByIndex.value[index] = true;
+
+  try {
+    const response = await api.patch(
+      `/pipelines/${pipelineName.value}/assets/${index}/module`,
+      {
+        targetModule,
+        preserveCompatibleParams: true,
+        dryRun: false,
+      },
+    );
+
+    const changed = Boolean(response.data?.changed);
+    $q.notify({
+      type: changed ? 'positive' : 'info',
+      message: changed
+        ? `Swapped asset ${index} to '${targetModule}'.`
+        : `Asset ${index} already uses '${targetModule}'.`,
+    });
+
+    await getModules();
+  } catch (error: unknown) {
+    $q.notify({
+      type: 'negative',
+      message: getApiErrorMessage(error, 'Failed to swap module.'),
+    });
+  } finally {
+    isSwappingByIndex.value[index] = false;
+  }
 };
 
 const isTerminalStatus = (status: string | null) => {
@@ -163,8 +364,7 @@ const fetchRunStatus = async () => {
 
   try {
     isPollingStatus.value = true;
-    const pipelineName = route.params.pipelineName as string;
-    const response = await api.get(`/pipelines/${pipelineName}/runs/${activeRunId.value}/status`);
+    const response = await api.get(`/pipelines/${pipelineName.value}/runs/${activeRunId.value}/status`);
     const status = response.data?.status;
     const runUrl = response.data?.runUrl;
 
@@ -197,8 +397,7 @@ const runPipeline = async () => {
   isLaunching.value = true;
 
   try {
-    const pipelineName = route.params.pipelineName as string;
-    const response = await api.post(`/pipelines/${pipelineName}/run`, {});
+    const response = await api.post(`/pipelines/${pipelineName.value}/run`, {});
     const runId = response.data?.runId;
     const status = response.data?.status;
     const runUrl = response.data?.runUrl;

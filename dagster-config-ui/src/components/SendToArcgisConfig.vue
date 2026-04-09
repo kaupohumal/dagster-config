@@ -34,8 +34,11 @@ import {getApiErrorMessage} from "../utils/errors";
 
 const route = useRoute();
 const $q = useQuasar();
+const props = defineProps<{
+  moduleIndex: number;
+}>();
 
-const apiEndpoint: string = `pipelines/${route.params.pipelineName as string}/modules/send_to_arcgis`;
+const apiEndpoint: string = `pipelines/${route.params.pipelineName as string}/modules/send_to_arcgis/${props.moduleIndex}`;
 const layerName = ref<string>('');
 const sublayerName = ref<string>('');
 const featureServiceAddress = ref<string>('');

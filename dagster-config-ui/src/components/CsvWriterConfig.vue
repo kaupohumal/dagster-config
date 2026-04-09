@@ -24,8 +24,11 @@ import {getApiErrorMessage} from "../utils/errors";
 
 const route = useRoute();
 const $q = useQuasar();
+const props = defineProps<{
+  moduleIndex: number;
+}>();
 
-const apiEndpoint: string = `pipelines/${route.params.pipelineName as string}/modules/write_to_csv`;
+const apiEndpoint: string = `pipelines/${route.params.pipelineName as string}/modules/write_to_csv/${props.moduleIndex}`;
 const fileName = ref<string>('bus_validations.csv')
 
 onMounted(async () => {

@@ -53,6 +53,73 @@ curl -X POST "http://localhost:5000/pipelines/<pipeline_name>/run" \
   -d '{}'
 ```
 
+Create a new pipeline from modules:
+
+```bash
+curl -X POST "http://localhost:5000/pipelines" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pipelineName": "my_new_pipeline",
+    "modules": [
+      "http_get",
+      "json_mapper",
+      "write_to_csv"
+    ]
+  }'
+```
+
+Swap an asset module by asset index:
+
+```bash
+curl -X PATCH "http://localhost:5000/pipelines/my_new_pipeline/assets/2/module" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "targetModule": "send_to_arcgis",
+    "preserveCompatibleParams": true,
+    "dryRun": false
+  }'
+```
+
+List supported modules and pipeline entries:
+
+```bash
+curl "http://localhost:5000/module-catalog"
+curl "http://localhost:5000/pipelines/my_new_pipeline/module-entries"
+```
+
+Get or update one specific module config by module entry index:
+
+```bash
+curl "http://localhost:5000/pipelines/my_new_pipeline/modules/http_get/0"
+
+curl -X PATCH "http://localhost:5000/pipelines/my_new_pipeline/modules/http_get/0" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "endpoint": "https://example.com/api",
+    "params": [{"key": "page", "value": "1"}]
+  }'
+```
+
+Add or remove modules in an existing pipeline:
+
+```bash
+curl -X POST "http://localhost:5000/pipelines/my_new_pipeline/assets" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "targetModule": "transform_to_arcgis_format",
+    "insertIndex": 2
+  }'
+
+curl -X DELETE "http://localhost:5000/pipelines/my_new_pipeline/assets/2"
+```
+
+Run backend tests:
+
+```bash
+cd dagster-config-server
+python3 -m unittest tests/test_modules_pipeline_builder.py
+```
+
 ## UI
 
 ```cd dagster-config-ui```
@@ -60,3 +127,12 @@ curl -X POST "http://localhost:5000/pipelines/<pipeline_name>/run" \
 ```yarn install```
 
 ```yarn quasar dev```
+
+Manual UI test flow:
+
+1. Open `/pipelines` and click **Create pipeline**.
+2. Enter a pipeline name, pick module order, and click **Create**.
+3. Open the created pipeline page.
+4. Use the module dropdown on an asset card and click **Swap**.
+5. Confirm the card type updates and saved YAML reflects the module change.
+

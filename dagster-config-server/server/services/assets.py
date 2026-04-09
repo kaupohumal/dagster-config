@@ -12,6 +12,46 @@ def find_asset_by_module(config: dict[str, Any], module_name: str) -> dict[str, 
     return None
 
 
+def find_asset_by_module_entry_index(
+    config: dict[str, Any],
+    module_entry_index: int,
+) -> dict[str, Any] | None:
+    if not isinstance(module_entry_index, int) or module_entry_index < 0:
+        return None
+
+    current_index = 0
+    for job in config.get("jobs", []) or []:
+        if not isinstance(job, dict):
+            continue
+        for asset in job.get("assets", []) or []:
+            if not isinstance(asset, dict):
+                continue
+            module_name = asset.get("module")
+            if not isinstance(module_name, str) or not module_name.strip():
+                continue
+            if current_index == module_entry_index:
+                return asset
+            current_index += 1
+    return None
+
+
+def find_asset_by_module_and_entry_index(
+    config: dict[str, Any],
+    module_name: str,
+    module_entry_index: int,
+) -> dict[str, Any] | None:
+    asset = find_asset_by_module_entry_index(config, module_entry_index)
+    if not asset:
+        return None
+
+    resolved_module = asset.get("module")
+    if not isinstance(resolved_module, str) or resolved_module.strip() != module_name:
+        raise LookupError(
+            f"Asset at index {module_entry_index} is not module '{module_name}'."
+        )
+    return asset
+
+
 def find_resource_by_type(config: dict[str, Any], resource_type: str) -> dict[str, Any] | None:
 
     for resource in config.get("resources", []) or []:

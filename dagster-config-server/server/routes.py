@@ -4,7 +4,15 @@ from flask import Blueprint, jsonify, request
 
 from .services.dagster_graphql import DagsterGraphQLError, get_run_status, trigger_pipeline_run
 from .services.job_config import update_module_config
-from .services.modules import list_module_names_for_pipeline
+from .services.modules import (
+    add_module_to_pipeline,
+    create_pipeline_from_modules,
+    list_module_catalog,
+    list_module_entries_for_pipeline,
+    list_module_names_for_pipeline,
+    remove_module_from_pipeline,
+    swap_module_for_pipeline_asset,
+)
 from .services.pipelines import list_pipeline_names
 from .services.modules import get_module_data as get_module_data_service
 from .services.run_config import apply_arcgis_resource_config
@@ -40,10 +48,149 @@ def get_pipeline_modules(pipeline_name: str):
     return jsonify(modules), 200
 
 
+@api.get("/module-catalog")
+def get_module_catalog():
+    return jsonify(list_module_catalog()), 200
+
+
+@api.get("/pipelines/<pipeline_name>/module-entries")
+def get_pipeline_module_entries(pipeline_name: str):
+    try:
+        entries = list_module_entries_for_pipeline(pipeline_name)
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    except FileNotFoundError as e:
+        return jsonify({"ok": False, "error": str(e)}), 404
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Failed to list module entries: {e}"}), 500
+
+    return jsonify(entries), 200
+
+
+@api.post("/pipelines")
+def create_pipeline():
+    payload = request.get_json(silent=True) or {}
+
+    pipeline_name = payload.get("pipelineName") if isinstance(payload, dict) else None
+    modules = payload.get("modules") if isinstance(payload, dict) else None
+    job_name = payload.get("jobName") if isinstance(payload, dict) else None
+
+    try:
+        result = create_pipeline_from_modules(
+            pipeline_name=pipeline_name,
+            module_specs=modules,
+            job_name=job_name,
+        )
+    except FileExistsError as e:
+        return jsonify({"ok": False, "error": str(e)}), 409
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    except EnvironmentError as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Failed to create pipeline: {e}"}), 500
+
+    return jsonify(result), 201
+
+
+@api.patch("/pipelines/<pipeline_name>/assets/<int:asset_index>/module")
+def swap_pipeline_asset_module(pipeline_name: str, asset_index: int):
+    payload = request.get_json(silent=True) or {}
+
+    target_module = payload.get("targetModule") if isinstance(payload, dict) else None
+    preserve_compatible_params = bool(payload.get("preserveCompatibleParams", True))
+    dry_run = bool(payload.get("dryRun", False))
+
+    try:
+        result = swap_module_for_pipeline_asset(
+            pipeline_name=pipeline_name,
+            asset_index=asset_index,
+            target_module_name=target_module,
+            preserve_compatible_params=preserve_compatible_params,
+            dry_run=dry_run,
+        )
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    except FileNotFoundError as e:
+        return jsonify({"ok": False, "error": str(e)}), 404
+    except LookupError as e:
+        return jsonify({"ok": False, "error": str(e)}), 404
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Failed to swap module: {e}"}), 500
+
+    return jsonify(result), 200
+
+
+@api.post("/pipelines/<pipeline_name>/assets")
+def add_pipeline_asset_module(pipeline_name: str):
+    payload = request.get_json(silent=True) or {}
+
+    target_module = payload.get("targetModule") if isinstance(payload, dict) else None
+    insert_index = payload.get("insertIndex") if isinstance(payload, dict) else None
+    asset_name = payload.get("assetName") if isinstance(payload, dict) else None
+    group = payload.get("group") if isinstance(payload, dict) else None
+    params = payload.get("params") if isinstance(payload, dict) else None
+
+    try:
+        result = add_module_to_pipeline(
+            pipeline_name=pipeline_name,
+            target_module_name=target_module,
+            insert_index=insert_index,
+            asset_name=asset_name,
+            group=group,
+            params=params,
+        )
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    except FileNotFoundError as e:
+        return jsonify({"ok": False, "error": str(e)}), 404
+    except LookupError as e:
+        return jsonify({"ok": False, "error": str(e)}), 404
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Failed to add module: {e}"}), 500
+
+    return jsonify(result), 201
+
+
+@api.delete("/pipelines/<pipeline_name>/assets/<int:asset_index>")
+def remove_pipeline_asset_module(pipeline_name: str, asset_index: int):
+    try:
+        result = remove_module_from_pipeline(
+            pipeline_name=pipeline_name,
+            asset_index=asset_index,
+        )
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    except FileNotFoundError as e:
+        return jsonify({"ok": False, "error": str(e)}), 404
+    except LookupError as e:
+        return jsonify({"ok": False, "error": str(e)}), 404
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Failed to remove module: {e}"}), 500
+
+    return jsonify(result), 200
+
+
 @api.get("/pipelines/<pipeline_name>/modules/<module_name>")
 def get_module_data(pipeline_name: str, module_name: str):
     try:
         data = get_module_data_service(pipeline_name, module_name)
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    except FileNotFoundError as e:
+        return jsonify({"ok": False, "error": str(e)}), 404
+    except LookupError as e:
+        return jsonify({"ok": False, "error": str(e)}), 404
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Failed to get module data: {e}"}), 500
+
+    return jsonify(data), 200
+
+
+@api.get("/pipelines/<pipeline_name>/modules/<module_name>/<int:module_index>")
+def get_module_data_by_index(pipeline_name: str, module_name: str, module_index: int):
+    try:
+        data = get_module_data_service(pipeline_name, module_name, module_index=module_index)
     except ValueError as e:
         return jsonify({"ok": False, "error": str(e)}), 400
     except FileNotFoundError as e:
@@ -62,6 +209,29 @@ def update_module_data(pipeline_name: str, module_name: str):
 
     try:
         resp = update_module_config(pipeline_name, module_name, payload)
+    except FileNotFoundError as e:
+        return jsonify({"ok": False, "error": str(e)}), 404
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    except LookupError as e:
+        return jsonify({"ok": False, "error": str(e)}), 404
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Failed to update YAML: {e}"}), 500
+
+    return jsonify(resp), 200
+
+
+@api.patch("/pipelines/<pipeline_name>/modules/<module_name>/<int:module_index>")
+def update_module_data_by_index(pipeline_name: str, module_name: str, module_index: int):
+    payload = request.get_json(silent=True) or {}
+
+    try:
+        resp = update_module_config(
+            pipeline_name,
+            module_name,
+            payload,
+            module_index=module_index,
+        )
     except FileNotFoundError as e:
         return jsonify({"ok": False, "error": str(e)}), 404
     except ValueError as e:

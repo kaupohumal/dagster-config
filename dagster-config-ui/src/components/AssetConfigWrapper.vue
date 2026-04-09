@@ -3,35 +3,35 @@
     v-if="parsedAssetName === AssetName.Timeseries"
     class="q-pa-xs module-card"
   >
-    <HttpGetModuleConfig/>
+    <HttpGetModuleConfig :module-index="props.moduleIndex"/>
   </q-card>
 
   <q-card
     v-if="parsedAssetName === AssetName.Mapper"
     class="q-pa-xs module-card"
   >
-    <JsonMapperConfig/>
+    <JsonMapperConfig :module-index="props.moduleIndex"/>
   </q-card>
 
   <q-card
     v-if="parsedAssetName === AssetName.CsvWriter"
     class="q-pa-xs module-card"
   >
-    <CsvWriterConfig/>
+    <CsvWriterConfig :module-index="props.moduleIndex"/>
   </q-card>
 
   <q-card
     v-if="parsedAssetName === AssetName.TransformToArcgisFormat"
     class="q-pa-xs module-card"
   >
-    <TransformToArcgisFormatConfig/>
+    <TransformToArcgisFormatConfig :module-index="props.moduleIndex"/>
   </q-card>
 
   <q-card
     v-if="parsedAssetName === AssetName.SendToArcgis"
     class="q-pa-xs module-card"
   >
-    <SendToArcgisConfig/>
+    <SendToArcgisConfig :module-index="props.moduleIndex"/>
   </q-card>
 
   <q-card
@@ -57,6 +57,7 @@ import {AssetName, parseAssetName} from "components/models";
 
 const props = defineProps<{
   assetName: string;
+  moduleIndex: number;
 }>();
 
 const parsedAssetName = computed(() => parseAssetName(props.assetName));

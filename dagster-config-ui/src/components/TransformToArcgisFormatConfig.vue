@@ -49,8 +49,11 @@ import {getApiErrorMessage} from "../utils/errors";
 
 const route = useRoute();
 const $q = useQuasar();
+const props = defineProps<{
+  moduleIndex: number;
+}>();
 
-const apiEndpoint: string = `pipelines/${route.params.pipelineName as string}/modules/transform_to_arcgis_format`;
+const apiEndpoint: string = `pipelines/${route.params.pipelineName as string}/modules/transform_to_arcgis_format/${props.moduleIndex}`;
 const renameCoordinates = ref(false);
 const lat = ref<string>('');
 const lng = ref<string>('');

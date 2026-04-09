@@ -65,8 +65,11 @@ import {getApiErrorMessage} from "../utils/errors";
 
 const route = useRoute();
 const $q = useQuasar();
+const props = defineProps<{
+  moduleIndex: number;
+}>();
 
-const apiEndpoint: string = `pipelines/${route.params.pipelineName as string}/modules/http_get`;
+const apiEndpoint: string = `pipelines/${route.params.pipelineName as string}/modules/http_get/${props.moduleIndex}`;
 const moduleEndpoint = ref<string|null>(null);
 const params = ref<Parameter[]>([createEmptyPair(PARAMETER_FIELDS)]);
 
