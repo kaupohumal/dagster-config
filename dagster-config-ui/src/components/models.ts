@@ -37,6 +37,11 @@ export interface CreatePipelinePayload {
   jobName?: string;
 }
 
+export interface PipelineSchedule {
+  hasSchedule: boolean;
+  cron: string | null;
+}
+
 export interface SwapModulePayload {
   targetModule: string;
   preserveCompatibleParams?: boolean;

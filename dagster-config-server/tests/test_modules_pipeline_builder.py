@@ -12,6 +12,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 modules_service = importlib.import_module("server.services.modules")
+pipelines_service = importlib.import_module("server.services.pipelines")
 yaml_loader = importlib.import_module("server.services.yaml_loader")
 job_config_service = importlib.import_module("server.services.job_config")
 
@@ -21,6 +22,8 @@ swap_module_for_pipeline_asset = modules_service.swap_module_for_pipeline_asset
 add_module_to_pipeline = modules_service.add_module_to_pipeline
 remove_module_from_pipeline = modules_service.remove_module_from_pipeline
 get_module_data = modules_service.get_module_data
+get_pipeline_schedule = pipelines_service.get_pipeline_schedule
+set_pipeline_schedule = pipelines_service.set_pipeline_schedule
 update_module_config = job_config_service.update_module_config
 load_config = yaml_loader.load_config
 
@@ -223,6 +226,52 @@ class PipelineBuilderTests(unittest.TestCase):
             assets = config["jobs"][0]["assets"]
             self.assertEqual([asset["module"] for asset in assets], ["http_get", "write_to_csv"])
             self.assertEqual(assets[1]["ins"], assets[0]["asset"])
+
+    def test_schedule_can_be_added_and_removed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            create_pipeline_from_modules(
+                pipeline_name="scheduled_pipeline",
+                module_specs=["http_get"],
+                pipelines_dir=tmpdir,
+            )
+
+            initial = get_pipeline_schedule("scheduled_pipeline", pipelines_dir=tmpdir)
+            self.assertFalse(initial["hasSchedule"])
+            self.assertIsNone(initial["cron"])
+
+            added = set_pipeline_schedule(
+                pipeline_name="scheduled_pipeline",
+                cron="*/5 * * * *",
+                pipelines_dir=tmpdir,
+            )
+            self.assertTrue(added["hasSchedule"])
+            self.assertEqual(added["cron"], "*/5 * * * *")
+
+            removed = set_pipeline_schedule(
+                pipeline_name="scheduled_pipeline",
+                cron=None,
+                pipelines_dir=tmpdir,
+            )
+            self.assertFalse(removed["hasSchedule"])
+            self.assertIsNone(removed["cron"])
+
+            config = load_config(str(Path(tmpdir) / "scheduled_pipeline.yaml"))
+            self.assertNotIn("schedule", config["jobs"][0])
+
+    def test_schedule_rejects_invalid_cron(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            create_pipeline_from_modules(
+                pipeline_name="bad_cron_pipeline",
+                module_specs=["http_get"],
+                pipelines_dir=tmpdir,
+            )
+
+            with self.assertRaises(ValueError):
+                set_pipeline_schedule(
+                    pipeline_name="bad_cron_pipeline",
+                    cron="every five minutes",
+                    pipelines_dir=tmpdir,
+                )
 
 
 if __name__ == "__main__":

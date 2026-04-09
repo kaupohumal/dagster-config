@@ -13,7 +13,7 @@ from .services.modules import (
     remove_module_from_pipeline,
     swap_module_for_pipeline_asset,
 )
-from .services.pipelines import list_pipeline_names
+from .services.pipelines import get_pipeline_schedule, list_pipeline_names, set_pipeline_schedule
 from .services.modules import get_module_data as get_module_data_service
 from .services.run_config import apply_arcgis_resource_config
 
@@ -65,6 +65,45 @@ def get_pipeline_module_entries(pipeline_name: str):
         return jsonify({"ok": False, "error": f"Failed to list module entries: {e}"}), 500
 
     return jsonify(entries), 200
+
+
+@api.get("/pipelines/<pipeline_name>/schedule")
+def get_schedule_for_pipeline(pipeline_name: str):
+    try:
+        data = get_pipeline_schedule(pipeline_name)
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    except FileNotFoundError as e:
+        return jsonify({"ok": False, "error": str(e)}), 404
+    except LookupError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Failed to get schedule: {e}"}), 500
+
+    return jsonify(data), 200
+
+
+@api.patch("/pipelines/<pipeline_name>/schedule")
+def update_schedule_for_pipeline(pipeline_name: str):
+    payload = request.get_json(silent=True) or {}
+    if not isinstance(payload, dict) or "cron" not in payload:
+        return jsonify({"ok": False, "error": "payload must include 'cron' (string or null)."}), 400
+
+    try:
+        resp = set_pipeline_schedule(
+            pipeline_name=pipeline_name,
+            cron=payload.get("cron"),
+        )
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    except FileNotFoundError as e:
+        return jsonify({"ok": False, "error": str(e)}), 404
+    except LookupError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Failed to update schedule: {e}"}), 500
+
+    return jsonify(resp), 200
 
 
 @api.post("/pipelines")

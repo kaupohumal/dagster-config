@@ -38,6 +38,12 @@
       {{ statusError }}
     </div>
 
+    <PipelineScheduleConfig
+      :cron="pipelineSchedule.cron"
+      :loading="isLoadingSchedule || isSavingSchedule"
+      @save="saveSchedule"
+    />
+
     <div class="pipeline-flow q-mt-xl q-ml-xs" :style="flowStyle">
       <template v-for="(moduleEntry, index) in moduleEntries" :key="`${moduleEntry.name}-${moduleEntry.index}`">
         <div
@@ -128,10 +134,11 @@
 import {computed, nextTick, onBeforeUnmount, onBeforeUpdate, onMounted, ref, watch, type ComponentPublicInstance} from 'vue';
 import {api} from "boot/axios";
 import AssetConfigWrapper from "components/AssetConfigWrapper.vue";
+import PipelineScheduleConfig from 'components/PipelineScheduleConfig.vue';
 import {useRoute} from "vue-router";
 import {useQuasar} from "quasar";
 import {getApiErrorMessage} from "../utils/errors";
-import type { ModuleCatalogEntry, ModuleEntry } from 'components/models';
+import type { ModuleCatalogEntry, ModuleEntry, PipelineSchedule } from 'components/models';
 
 const route = useRoute();
 const $q = useQuasar();
@@ -154,6 +161,9 @@ const statusError = ref<string | null>(null);
 const isPollingStatus = ref(false);
 const flowItemRefs = ref<HTMLElement[]>([]);
 const maxCardHeight = ref<number | null>(null);
+const pipelineSchedule = ref<PipelineSchedule>({ hasSchedule: false, cron: null });
+const isLoadingSchedule = ref(false);
+const isSavingSchedule = ref(false);
 
 const TERMINAL_STATUSES = new Set(["SUCCESS", "FAILURE", "CANCELED", "CANCELING"]);
 const STATUS_POLL_INTERVAL_MS = 3000;
@@ -188,7 +198,7 @@ const runStatusColor = computed(() => {
 });
 
 onMounted(async () => {
-  await Promise.all([getModules(), getModuleCatalog()]);
+  await Promise.all([getModules(), getModuleCatalog(), getSchedule()]);
   await nextTick();
   observeCards();
   recomputeMaxCardHeight();
@@ -234,6 +244,51 @@ const getModuleCatalog = async () => {
       && typeof (entry as { default_asset?: unknown }).default_asset === 'string'
       && Array.isArray((entry as { required_resources?: unknown }).required_resources),
   );
+};
+
+const getSchedule = async () => {
+  isLoadingSchedule.value = true;
+  try {
+    const response = await api.get(`/pipelines/${pipelineName.value}/schedule`);
+    const hasSchedule = response.data?.hasSchedule === true;
+    const cron = typeof response.data?.cron === 'string' ? response.data.cron : null;
+    pipelineSchedule.value = {
+      hasSchedule,
+      cron: hasSchedule ? cron : null,
+    };
+  } catch (error: unknown) {
+    $q.notify({
+      type: 'negative',
+      message: getApiErrorMessage(error, 'Failed to load pipeline schedule.'),
+    });
+  } finally {
+    isLoadingSchedule.value = false;
+  }
+};
+
+const saveSchedule = async (cron: string | null) => {
+  isSavingSchedule.value = true;
+  try {
+    const response = await api.patch(`/pipelines/${pipelineName.value}/schedule`, { cron });
+    const hasSchedule = response.data?.hasSchedule === true;
+    const savedCron = typeof response.data?.cron === 'string' ? response.data.cron : null;
+    pipelineSchedule.value = {
+      hasSchedule,
+      cron: hasSchedule ? savedCron : null,
+    };
+
+    $q.notify({
+      type: 'positive',
+      message: hasSchedule ? `Saved schedule: ${savedCron}.` : 'Schedule removed.',
+    });
+  } catch (error: unknown) {
+    $q.notify({
+      type: 'negative',
+      message: getApiErrorMessage(error, 'Failed to save pipeline schedule.'),
+    });
+  } finally {
+    isSavingSchedule.value = false;
+  }
 };
 
 const openAddModuleDialog = (insertIndex: number) => {
