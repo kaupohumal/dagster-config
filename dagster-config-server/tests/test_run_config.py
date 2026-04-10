@@ -117,6 +117,54 @@ class RunConfigTests(unittest.TestCase):
             finally:
                 self._restore_jobs_dir(previous_jobs_dir)
 
+    def test_arcgis_pipeline_preserves_yaml_token_when_run_config_token_is_empty(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            save_config(
+                str(Path(tmpdir) / "with_arcgis_token.yaml"),
+                {
+                    "resources": [
+                        {
+                            "resource": "ArcGIS",
+                            "name": "arcGIS",
+                            "params": {
+                                "token": "persisted-token",
+                                "feature_service_address": "gis.example",
+                            },
+                        }
+                    ],
+                    "jobs": [
+                        {
+                            "job": "with_arcgis_token",
+                            "assets": [
+                                {"asset": "send", "module": "send_to_arcgis"},
+                            ],
+                        }
+                    ],
+                },
+            )
+
+            previous_jobs_dir = self._with_jobs_dir(tmpdir)
+            try:
+                merged = apply_arcgis_resource_config(
+                    "with_arcgis_token",
+                    run_config_data={
+                        "resources": {
+                            "arcGIS": {
+                                "config": {
+                                    "token": "",
+                                    "feature_service_address": "override",
+                                }
+                            }
+                        }
+                    },
+                )
+            finally:
+                self._restore_jobs_dir(previous_jobs_dir)
+
+            config = merged["resources"]["arcGIS"]["config"]
+            self.assertEqual(config["token"], "persisted-token")
+            self.assertEqual(config["feature_service_address"], "override")
+
 
 if __name__ == "__main__":
     unittest.main()

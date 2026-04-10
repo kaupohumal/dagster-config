@@ -115,6 +115,48 @@ class PipelineBuilderTests(unittest.TestCase):
             self.assertEqual(assets[1]["module"], "send_to_arcgis")
             self.assertEqual(assets[1]["params"]["layer_name"], "")
             self.assertTrue(isinstance(config.get("resources"), list) and len(config["resources"]) == 1)
+            self.assertEqual(config["resources"][0]["params"]["token"], "")
+
+    def test_send_to_arcgis_token_is_write_only_in_module_data(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            previous_jobs_dir = os.environ.get("JOBS_DIR")
+            os.environ["JOBS_DIR"] = tmpdir
+
+            create_pipeline_from_modules(
+                pipeline_name="arcgis_token_pipeline",
+                module_specs=["send_to_arcgis"],
+                pipelines_dir=tmpdir,
+            )
+
+            try:
+                initial_module_data = get_module_data(
+                    "arcgis_token_pipeline", "send_to_arcgis", module_index=0
+                )
+                self.assertFalse(initial_module_data["tokenSet"])
+                self.assertNotIn("token", initial_module_data)
+
+                update_module_config(
+                    pipeline_name="arcgis_token_pipeline",
+                    module_name="send_to_arcgis",
+                    payload={"arcgisToken": "super-secret-token"},
+                    module_index=0,
+                )
+
+                updated_module_data = get_module_data(
+                    "arcgis_token_pipeline", "send_to_arcgis", module_index=0
+                )
+            finally:
+                if previous_jobs_dir is None:
+                    del os.environ["JOBS_DIR"]
+                else:
+                    os.environ["JOBS_DIR"] = previous_jobs_dir
+
+            self.assertTrue(updated_module_data["tokenSet"])
+            self.assertNotIn("token", updated_module_data)
+
+            config = load_config(str(Path(tmpdir) / "arcgis_token_pipeline.yaml"))
+            resource = config["resources"][0]
+            self.assertEqual(resource["params"]["token"], "super-secret-token")
 
     def test_indexed_module_read_for_duplicates(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

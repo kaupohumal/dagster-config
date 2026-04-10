@@ -139,7 +139,7 @@ def _ensure_arcgis_resource(config: dict[str, Any]) -> bool:
             "resource": "ArcGIS",
             "name": "arcGIS",
             "params": {
-                "token": "ARCGIS_API",
+                "token": "",
                 "feature_service_address": "",
             },
         }
@@ -691,11 +691,15 @@ def get_send_to_arcgis_data(
     if not isinstance(resource_params, dict):
         resource_params = {}
 
+    token = resource_params.get("token")
+    token_set = isinstance(token, str) and bool(token.strip())
+
     return {
         "module": "send_to_arcgis",
         "layerName": params.get("layer_name"),
         "sublayerName": params.get("sublayer_name"),
         "featureServiceAddress": resource_params.get("feature_service_address"),
+        "tokenSet": token_set,
     }
 
 

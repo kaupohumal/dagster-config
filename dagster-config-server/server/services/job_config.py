@@ -81,13 +81,20 @@ def _update_send_to_arcgis(
     if "sublayerName" in payload:
         asset.setdefault("params", {})["sublayer_name"] = payload.get("sublayerName")
 
-    if "featureServiceAddress" in payload:
+    if "featureServiceAddress" in payload or "arcgisToken" in payload:
         resource = find_resource_by_type(data, "ArcGIS")
         if not resource:
             raise LookupError("No resource with type 'ArcGIS' found.")
-        resource.setdefault("params", {})["feature_service_address"] = payload.get(
-            "featureServiceAddress"
-        )
+        resource_params = resource.setdefault("params", {})
+
+        if "featureServiceAddress" in payload:
+            resource_params["feature_service_address"] = payload.get("featureServiceAddress")
+
+        if "arcgisToken" in payload:
+            arcgis_token = payload.get("arcgisToken")
+            if arcgis_token is not None and not isinstance(arcgis_token, str):
+                raise ValueError("arcgisToken must be a string or null")
+            resource_params["token"] = "" if arcgis_token is None else arcgis_token.strip()
 
 
 def update_module_config(

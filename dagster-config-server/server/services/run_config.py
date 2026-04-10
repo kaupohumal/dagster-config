@@ -74,6 +74,13 @@ def apply_arcgis_resource_config(
     merged_resource_config = dict(yaml_resource_params)
     merged_resource_config.update(resource_config)
 
+    yaml_token = yaml_resource_params.get("token")
+    merged_token = merged_resource_config.get("token")
+    if isinstance(yaml_token, str) and yaml_token.strip():
+        # Keep the persisted pipeline token if run config provided an empty token.
+        if not isinstance(merged_token, str) or not merged_token.strip():
+            merged_resource_config["token"] = yaml_token
+
     if isinstance(feature_service_address_override, str):
         normalized_override = feature_service_address_override.strip()
         if normalized_override:
