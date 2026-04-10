@@ -90,7 +90,9 @@ class PipelineBuilderTests(unittest.TestCase):
             config = load_config(str(Path(tmpdir) / "dry_run_pipeline.yaml"))
             assets = config["jobs"][0]["assets"]
             self.assertEqual(assets[1]["module"], "write_to_csv")
-            self.assertFalse(config.get("resources"))
+            resources = config.get("resources")
+            self.assertTrue(isinstance(resources, list) and len(resources) == 1)
+            self.assertEqual(resources[0].get("resource"), "MinIO")
 
     def test_swap_module_persists_and_adds_resource(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -114,8 +116,11 @@ class PipelineBuilderTests(unittest.TestCase):
             assets = config["jobs"][0]["assets"]
             self.assertEqual(assets[1]["module"], "send_to_arcgis")
             self.assertEqual(assets[1]["params"]["layer_name"], "")
-            self.assertTrue(isinstance(config.get("resources"), list) and len(config["resources"]) == 1)
-            self.assertEqual(config["resources"][0]["params"]["token"], "")
+            resources = config.get("resources")
+            self.assertTrue(isinstance(resources, list) and len(resources) == 2)
+            arcgis_resource = next((resource for resource in resources if resource.get("resource") == "ArcGIS"), None)
+            self.assertIsNotNone(arcgis_resource)
+            self.assertEqual(arcgis_resource["params"]["token"], "")
 
     def test_send_to_arcgis_token_is_write_only_in_module_data(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -157,6 +162,74 @@ class PipelineBuilderTests(unittest.TestCase):
             config = load_config(str(Path(tmpdir) / "arcgis_token_pipeline.yaml"))
             resource = config["resources"][0]
             self.assertEqual(resource["params"]["token"], "super-secret-token")
+
+    def test_create_pipeline_with_write_to_csv_adds_minio_resource(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            create_pipeline_from_modules(
+                pipeline_name="csv_pipeline",
+                module_specs=["write_to_csv"],
+                pipelines_dir=tmpdir,
+            )
+
+            config = load_config(str(Path(tmpdir) / "csv_pipeline.yaml"))
+            asset = config["jobs"][0]["assets"][0]
+            resources = config.get("resources")
+            self.assertEqual(asset["params"]["minio"]["bucket"], "dagster-integration")
+            self.assertTrue(isinstance(resources, list) and len(resources) == 1)
+            self.assertEqual(resources[0]["resource"], "MinIO")
+            self.assertEqual(resources[0]["name"], "minio")
+
+    def test_write_to_csv_secret_key_is_write_only_in_module_data(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            previous_jobs_dir = os.environ.get("JOBS_DIR")
+            os.environ["JOBS_DIR"] = tmpdir
+
+            create_pipeline_from_modules(
+                pipeline_name="csv_secret_pipeline",
+                module_specs=["write_to_csv"],
+                pipelines_dir=tmpdir,
+            )
+
+            try:
+                initial_module_data = get_module_data(
+                    "csv_secret_pipeline", "write_to_csv", module_index=0
+                )
+                self.assertFalse(initial_module_data["minioSecretKeySet"])
+                self.assertNotIn("minioSecretKey", initial_module_data)
+                self.assertEqual(initial_module_data["minioBucket"], "dagster-integration")
+
+                update_module_config(
+                    pipeline_name="csv_secret_pipeline",
+                    module_name="write_to_csv",
+                    payload={
+                        "minioBucket": "integration-results",
+                        "minioHost": "https://minio.local",
+                        "minioAccessKey": "MINIO_ACCESS_KEY",
+                        "minioSecretKey": "MINIO_SECRET_KEY",
+                    },
+                    module_index=0,
+                )
+
+                updated_module_data = get_module_data(
+                    "csv_secret_pipeline", "write_to_csv", module_index=0
+                )
+            finally:
+                if previous_jobs_dir is None:
+                    del os.environ["JOBS_DIR"]
+                else:
+                    os.environ["JOBS_DIR"] = previous_jobs_dir
+
+            self.assertTrue(updated_module_data["minioSecretKeySet"])
+            self.assertNotIn("minioSecretKey", updated_module_data)
+            self.assertEqual(updated_module_data["minioBucket"], "integration-results")
+            self.assertEqual(updated_module_data["minioHost"], "https://minio.local")
+            self.assertEqual(updated_module_data["minioAccessKey"], "MINIO_ACCESS_KEY")
+
+            config = load_config(str(Path(tmpdir) / "csv_secret_pipeline.yaml"))
+            asset = config["jobs"][0]["assets"][0]
+            resource = config["resources"][0]
+            self.assertEqual(asset["params"]["minio"]["bucket"], "integration-results")
+            self.assertEqual(resource["params"]["secret_key"], "MINIO_SECRET_KEY")
 
     def test_indexed_module_read_for_duplicates(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -268,6 +341,85 @@ class PipelineBuilderTests(unittest.TestCase):
             assets = config["jobs"][0]["assets"]
             self.assertEqual([asset["module"] for asset in assets], ["http_get", "write_to_csv"])
             self.assertEqual(assets[1]["ins"], assets[0]["asset"])
+
+    def test_remove_write_to_csv_removes_unused_minio_resource(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            previous_jobs_dir = os.environ.get("JOBS_DIR")
+            os.environ["JOBS_DIR"] = tmpdir
+            create_pipeline_from_modules(
+                pipeline_name="remove_minio_pipeline",
+                module_specs=["http_get", "write_to_csv"],
+                pipelines_dir=tmpdir,
+            )
+
+            try:
+                result = remove_module_from_pipeline(
+                    pipeline_name="remove_minio_pipeline",
+                    asset_index=1,
+                )
+            finally:
+                if previous_jobs_dir is None:
+                    del os.environ["JOBS_DIR"]
+                else:
+                    os.environ["JOBS_DIR"] = previous_jobs_dir
+
+            config = load_config(str(Path(tmpdir) / "remove_minio_pipeline.yaml"))
+            self.assertEqual(result.get("removedResources"), ["MinIO"])
+            self.assertEqual([asset["module"] for asset in config["jobs"][0]["assets"]], ["http_get"])
+            self.assertEqual(config.get("resources"), [])
+
+    def test_remove_send_to_arcgis_removes_unused_arcgis_resource(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            previous_jobs_dir = os.environ.get("JOBS_DIR")
+            os.environ["JOBS_DIR"] = tmpdir
+            create_pipeline_from_modules(
+                pipeline_name="remove_arcgis_pipeline",
+                module_specs=["http_get", "send_to_arcgis"],
+                pipelines_dir=tmpdir,
+            )
+
+            try:
+                result = remove_module_from_pipeline(
+                    pipeline_name="remove_arcgis_pipeline",
+                    asset_index=1,
+                )
+            finally:
+                if previous_jobs_dir is None:
+                    del os.environ["JOBS_DIR"]
+                else:
+                    os.environ["JOBS_DIR"] = previous_jobs_dir
+
+            config = load_config(str(Path(tmpdir) / "remove_arcgis_pipeline.yaml"))
+            self.assertEqual(result.get("removedResources"), ["ArcGIS"])
+            self.assertEqual([asset["module"] for asset in config["jobs"][0]["assets"]], ["http_get"])
+            self.assertEqual(config.get("resources"), [])
+
+    def test_remove_module_keeps_resource_when_still_required(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            previous_jobs_dir = os.environ.get("JOBS_DIR")
+            os.environ["JOBS_DIR"] = tmpdir
+            create_pipeline_from_modules(
+                pipeline_name="keep_resource_pipeline",
+                module_specs=["write_to_csv", "write_to_csv"],
+                pipelines_dir=tmpdir,
+            )
+
+            try:
+                result = remove_module_from_pipeline(
+                    pipeline_name="keep_resource_pipeline",
+                    asset_index=1,
+                )
+            finally:
+                if previous_jobs_dir is None:
+                    del os.environ["JOBS_DIR"]
+                else:
+                    os.environ["JOBS_DIR"] = previous_jobs_dir
+
+            config = load_config(str(Path(tmpdir) / "keep_resource_pipeline.yaml"))
+            self.assertEqual(result.get("removedResources"), [])
+            resources = config.get("resources")
+            self.assertTrue(isinstance(resources, list) and len(resources) == 1)
+            self.assertEqual(resources[0].get("resource"), "MinIO")
 
     def test_schedule_can_be_added_and_removed(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

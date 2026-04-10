@@ -15,7 +15,7 @@ from .services.modules import (
 )
 from .services.pipelines import get_pipeline_schedule, list_pipeline_names, set_pipeline_schedule
 from .services.modules import get_module_data as get_module_data_service
-from .services.run_config import apply_arcgis_resource_config
+from .services.run_config import apply_arcgis_resource_config, apply_minio_resource_config
 
 api = Blueprint("api", __name__)
 
@@ -293,6 +293,10 @@ def run_pipeline(pipeline_name: str):
 
     try:
         run_config_data = apply_arcgis_resource_config(
+            pipeline_name=pipeline_name,
+            run_config_data=run_config_data,
+        )
+        run_config_data = apply_minio_resource_config(
             pipeline_name=pipeline_name,
             run_config_data=run_config_data,
         )

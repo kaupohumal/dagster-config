@@ -15,6 +15,7 @@ run_config_service = importlib.import_module("server.services.run_config")
 yaml_loader = importlib.import_module("server.services.yaml_loader")
 
 apply_arcgis_resource_config = run_config_service.apply_arcgis_resource_config
+apply_minio_resource_config = run_config_service.apply_minio_resource_config
 save_config = yaml_loader.save_config
 
 
@@ -164,6 +165,102 @@ class RunConfigTests(unittest.TestCase):
             config = merged["resources"]["arcGIS"]["config"]
             self.assertEqual(config["token"], "persisted-token")
             self.assertEqual(config["feature_service_address"], "override")
+
+    def test_minio_pipeline_merges_resource_config(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            save_config(
+                str(Path(tmpdir) / "with_minio.yaml"),
+                {
+                    "resources": [
+                        {
+                            "resource": "MinIO",
+                            "name": "minio",
+                            "params": {
+                                "host": "minio.local",
+                                "access_key": "MINIO_ACCESS_KEY",
+                                "secret_key": "MINIO_SECRET_KEY",
+                            },
+                        }
+                    ],
+                    "jobs": [
+                        {
+                            "job": "with_minio",
+                            "assets": [
+                                {"asset": "write", "module": "write_to_csv"},
+                            ],
+                        }
+                    ],
+                },
+            )
+
+            previous_jobs_dir = self._with_jobs_dir(tmpdir)
+            try:
+                merged = apply_minio_resource_config(
+                    "with_minio",
+                    run_config_data={
+                        "resources": {
+                            "minio": {
+                                "config": {
+                                    "host": "override.local",
+                                }
+                            }
+                        }
+                    },
+                )
+            finally:
+                self._restore_jobs_dir(previous_jobs_dir)
+
+            config = merged["resources"]["minio"]["config"]
+            self.assertEqual(config["host"], "override.local")
+            self.assertEqual(config["access_key"], "MINIO_ACCESS_KEY")
+            self.assertEqual(config["secret_key"], "MINIO_SECRET_KEY")
+
+    def test_minio_pipeline_preserves_yaml_secret_when_run_config_secret_is_empty(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            save_config(
+                str(Path(tmpdir) / "with_minio_secret.yaml"),
+                {
+                    "resources": [
+                        {
+                            "resource": "MinIO",
+                            "name": "minio",
+                            "params": {
+                                "host": "minio.local",
+                                "access_key": "MINIO_ACCESS_KEY",
+                                "secret_key": "persisted-secret",
+                            },
+                        }
+                    ],
+                    "jobs": [
+                        {
+                            "job": "with_minio_secret",
+                            "assets": [
+                                {"asset": "write", "module": "write_to_csv"},
+                            ],
+                        }
+                    ],
+                },
+            )
+
+            previous_jobs_dir = self._with_jobs_dir(tmpdir)
+            try:
+                merged = apply_minio_resource_config(
+                    "with_minio_secret",
+                    run_config_data={
+                        "resources": {
+                            "minio": {
+                                "config": {
+                                    "secret_key": "",
+                                }
+                            }
+                        }
+                    },
+                )
+            finally:
+                self._restore_jobs_dir(previous_jobs_dir)
+
+            config = merged["resources"]["minio"]["config"]
+            self.assertEqual(config["secret_key"], "persisted-secret")
 
 
 if __name__ == "__main__":

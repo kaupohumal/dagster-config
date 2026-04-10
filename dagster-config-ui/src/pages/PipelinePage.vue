@@ -344,10 +344,17 @@ const confirmRemoveModule = async () => {
 
   isRemovingByIndex.value[index] = true;
   try {
-    await api.delete(`/pipelines/${pipelineName.value}/assets/${index}`);
+    const response = await api.delete(`/pipelines/${pipelineName.value}/assets/${index}`);
+    const removedResources = Array.isArray(response.data?.removedResources)
+      ? response.data.removedResources.filter((item: unknown): item is string => typeof item === 'string' && item.length > 0)
+      : [];
+    const removedResourcesSuffix = removedResources.length > 0
+      ? ` Removed unused resources: ${removedResources.join(', ')}.`
+      : '';
+
     $q.notify({
       type: 'positive',
-      message: `Removed module at position ${index}.`,
+      message: `Removed module at position ${index}.${removedResourcesSuffix}`,
     });
     closeRemoveDialog();
     await getModules();

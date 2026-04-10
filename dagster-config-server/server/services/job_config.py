@@ -57,6 +57,41 @@ def _update_write_to_csv(data: dict[str, Any], payload: dict[str, Any], module_i
     if "fileName" in payload:
         asset.setdefault("params", {})["file_name"] = payload.get("fileName")
 
+    if "minioBucket" in payload:
+        minio_bucket = payload.get("minioBucket")
+        if minio_bucket is not None and not isinstance(minio_bucket, str):
+            raise ValueError("minioBucket must be a string or null")
+        params = asset.setdefault("params", {})
+        minio_params = params.get("minio")
+        if not isinstance(minio_params, dict):
+            minio_params = {}
+            params["minio"] = minio_params
+        minio_params["bucket"] = "" if minio_bucket is None else minio_bucket.strip()
+
+    if "minioHost" in payload or "minioAccessKey" in payload or "minioSecretKey" in payload:
+        resource = find_resource_by_type(data, "MinIO")
+        if not resource:
+            raise LookupError("No resource with type 'MinIO' found.")
+        resource_params = resource.setdefault("params", {})
+
+        if "minioHost" in payload:
+            minio_host = payload.get("minioHost")
+            if minio_host is not None and not isinstance(minio_host, str):
+                raise ValueError("minioHost must be a string or null")
+            resource_params["host"] = "" if minio_host is None else minio_host.strip()
+
+        if "minioAccessKey" in payload:
+            minio_access_key = payload.get("minioAccessKey")
+            if minio_access_key is not None and not isinstance(minio_access_key, str):
+                raise ValueError("minioAccessKey must be a string or null")
+            resource_params["access_key"] = "" if minio_access_key is None else minio_access_key.strip()
+
+        if "minioSecretKey" in payload:
+            minio_secret_key = payload.get("minioSecretKey")
+            if minio_secret_key is not None and not isinstance(minio_secret_key, str):
+                raise ValueError("minioSecretKey must be a string or null")
+            resource_params["secret_key"] = "" if minio_secret_key is None else minio_secret_key.strip()
+
 
 def _update_transform_to_arcgis_format(
     data: dict[str, Any], payload: dict[str, Any], module_index: int | None

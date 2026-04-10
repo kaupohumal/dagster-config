@@ -54,8 +54,11 @@ MODULE_CATALOG: dict[str, ModuleCatalogEntry] = {
         "default_asset": "write_csv",
         "default_params": {
             "file_name": "output.csv",
+            "minio": {
+                "bucket": "dagster-integration",
+            },
         },
-        "required_resources": [],
+        "required_resources": ["MinIO"],
     },
     "transform_to_arcgis_format": {
         "module": "transform_to_arcgis_format",
@@ -145,6 +148,85 @@ def _ensure_arcgis_resource(config: dict[str, Any]) -> bool:
         }
     )
     return True
+
+
+def _ensure_minio_resource(config: dict[str, Any]) -> bool:
+    if find_resource_by_type(config, "MinIO"):
+        return False
+
+    resources = config.get("resources")
+    if not isinstance(resources, list):
+        resources = []
+        config["resources"] = resources
+
+    resources.append(
+        {
+            "resource": "MinIO",
+            "name": "minio",
+            "params": {
+                "host": "",
+                "access_key": "",
+                "secret_key": "",
+            },
+        }
+    )
+    return True
+
+
+RESOURCE_ENSURERS = {
+    "ArcGIS": _ensure_arcgis_resource,
+    "MinIO": _ensure_minio_resource,
+}
+
+
+def _ensure_required_resources_for_module(config: dict[str, Any], module_name: str) -> list[str]:
+    added_resources: list[str] = []
+    for resource_type in MODULE_CATALOG[module_name]["required_resources"]:
+        ensure_fn = RESOURCE_ENSURERS.get(resource_type)
+        if ensure_fn and ensure_fn(config):
+            added_resources.append(resource_type)
+    return added_resources
+
+
+def _pipeline_requires_resource_type(config: dict[str, Any], resource_type: str) -> bool:
+    for asset in _get_assets(config):
+        module_name = asset.get("module")
+        if not isinstance(module_name, str):
+            continue
+        catalog_entry = MODULE_CATALOG.get(module_name.strip())
+        if not catalog_entry:
+            continue
+        if resource_type in catalog_entry["required_resources"]:
+            return True
+    return False
+
+
+def _remove_unused_resources(config: dict[str, Any], resource_types: set[str]) -> list[str]:
+    resources = config.get("resources")
+    if not isinstance(resources, list):
+        return []
+
+    removed_resources: list[str] = []
+    kept_resources: list[Any] = []
+
+    for resource in resources:
+        if not isinstance(resource, dict):
+            kept_resources.append(resource)
+            continue
+
+        resource_type = resource.get("resource")
+        if (
+            isinstance(resource_type, str)
+            and resource_type in resource_types
+            and not _pipeline_requires_resource_type(config, resource_type)
+        ):
+            removed_resources.append(resource_type)
+            continue
+
+        kept_resources.append(resource)
+
+    config["resources"] = kept_resources
+    return sorted(set(removed_resources))
 
 
 def _module_params_with_defaults(module_name: str, raw_params: object) -> dict[str, Any]:
@@ -359,7 +441,7 @@ def create_pipeline_from_modules(
         normalized_specs.append(spec | {"module": module_name})
 
     assets: list[dict[str, Any]] = []
-    requires_arcgis = False
+    required_resources: set[str] = set()
 
     for i, spec in enumerate(normalized_specs):
         module_name = spec["module"]
@@ -383,8 +465,7 @@ def create_pipeline_from_modules(
 
         assets.append(asset_data)
 
-        if "ArcGIS" in catalog_entry["required_resources"]:
-            requires_arcgis = True
+        required_resources.update(catalog_entry["required_resources"])
 
     config: dict[str, Any] = {
         "jobs": [
@@ -395,8 +476,10 @@ def create_pipeline_from_modules(
         ]
     }
 
-    if requires_arcgis:
-        _ensure_arcgis_resource(config)
+    for resource_type in required_resources:
+        ensure_fn = RESOURCE_ENSURERS.get(resource_type)
+        if ensure_fn:
+            ensure_fn(config)
 
     yaml_path = Path(pipelines_dir or get_jobs_dir()) / f"{name}.yaml"
     if yaml_path.exists():
@@ -471,8 +554,9 @@ def swap_module_for_pipeline_asset(
         elif "params" in asset:
             del asset["params"]
 
-        if "ArcGIS" in MODULE_CATALOG[target_module]["required_resources"] and _ensure_arcgis_resource(config):
-            diagnostics["addedResources"].append("ArcGIS")
+        diagnostics["addedResources"].extend(
+            _ensure_required_resources_for_module(config, target_module)
+        )
 
         save_config(str(yaml_path), config)
 
@@ -531,9 +615,7 @@ def add_module_to_pipeline(
     assets.insert(raw_insert_index, new_asset)
     _rewire_linear_inputs(assets)
 
-    added_resources: list[str] = []
-    if "ArcGIS" in MODULE_CATALOG[target_module]["required_resources"] and _ensure_arcgis_resource(config):
-        added_resources.append("ArcGIS")
+    added_resources = _ensure_required_resources_for_module(config, target_module)
 
     save_config(str(yaml_path), config)
     return {
@@ -562,12 +644,23 @@ def remove_module_from_pipeline(
     removed_asset = assets.pop(raw_remove_index)
     _rewire_linear_inputs(assets)
 
+    removed_resources: list[str] = []
+    removed_module_name = removed_asset.get("module")
+    if isinstance(removed_module_name, str):
+        catalog_entry = MODULE_CATALOG.get(removed_module_name.strip())
+        if catalog_entry:
+            removed_resources = _remove_unused_resources(
+                config,
+                set(catalog_entry["required_resources"]),
+            )
+
     save_config(str(yaml_path), config)
     return {
         "ok": True,
         "removedIndex": index,
         "module": removed_asset.get("module"),
         "asset": removed_asset.get("asset"),
+        "removedResources": removed_resources,
     }
 
 
@@ -642,10 +735,22 @@ def get_write_to_csv_data(
         params = {}
 
     file_name = params.get("file_name")
+    minio_params = params.get("minio") if isinstance(params.get("minio"), dict) else {}
+    resource = find_resource_by_type(config, "MinIO")
+    resource_params = resource.get("params") if isinstance(resource, dict) else None
+    if not isinstance(resource_params, dict):
+        resource_params = {}
+
+    secret_key = resource_params.get("secret_key")
+    secret_key_set = isinstance(secret_key, str) and bool(secret_key.strip())
 
     return {
         "module": "write_to_csv",
         "fileName": file_name,
+        "minioBucket": minio_params.get("bucket"),
+        "minioHost": resource_params.get("host"),
+        "minioAccessKey": resource_params.get("access_key"),
+        "minioSecretKeySet": secret_key_set,
     }
 
 
