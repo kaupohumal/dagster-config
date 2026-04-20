@@ -256,6 +256,103 @@ class PipelineBuilderTests(unittest.TestCase):
             self.assertEqual(first["endpoint"], "https://one.example")
             self.assertEqual(second["endpoint"], "https://two.example")
 
+    def test_http_get_auth_round_trip(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            previous_jobs_dir = os.environ.get("JOBS_DIR")
+            os.environ["JOBS_DIR"] = tmpdir
+            create_pipeline_from_modules(
+                pipeline_name="http_auth_pipeline",
+                module_specs=["http_get"],
+                pipelines_dir=tmpdir,
+            )
+
+            try:
+                update_module_config(
+                    pipeline_name="http_auth_pipeline",
+                    module_name="http_get",
+                    payload={
+                        "auth": {
+                            "basic_auth": {
+                                "username": "service-user",
+                                "password": "service-password",
+                            }
+                        }
+                    },
+                    module_index=0,
+                )
+
+                module_data = get_module_data("http_auth_pipeline", "http_get", module_index=0)
+
+                update_module_config(
+                    pipeline_name="http_auth_pipeline",
+                    module_name="http_get",
+                    payload={
+                        "auth": {
+                            "api_key": {
+                                "key": "{{ env.TIMESERIES_API_KEY }}",
+                                "key_name": "api_key",
+                            }
+                        }
+                    },
+                    module_index=0,
+                )
+            finally:
+                if previous_jobs_dir is None:
+                    del os.environ["JOBS_DIR"]
+                else:
+                    os.environ["JOBS_DIR"] = previous_jobs_dir
+
+            self.assertEqual(
+                module_data["auth"],
+                {"basic_auth": {"username": "service-user", "password": "service-password"}},
+            )
+
+            config = load_config(str(Path(tmpdir) / "http_auth_pipeline.yaml"))
+            auth = config["jobs"][0]["assets"][0]["params"]["auth"]
+            self.assertEqual(
+                auth,
+                {
+                    "api_key": {
+                        "key": "{{ env.TIMESERIES_API_KEY }}",
+                        "key_name": "api_key",
+                    }
+                },
+            )
+
+    def test_http_get_auth_rejects_multiple_modes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            previous_jobs_dir = os.environ.get("JOBS_DIR")
+            os.environ["JOBS_DIR"] = tmpdir
+            create_pipeline_from_modules(
+                pipeline_name="http_auth_invalid_pipeline",
+                module_specs=["http_get"],
+                pipelines_dir=tmpdir,
+            )
+
+            try:
+                with self.assertRaises(ValueError):
+                    update_module_config(
+                        pipeline_name="http_auth_invalid_pipeline",
+                        module_name="http_get",
+                        payload={
+                            "auth": {
+                                "api_key": {
+                                    "key": "A",
+                                    "key_name": "api_key",
+                                },
+                                "bearer_token": {
+                                    "token": "B",
+                                },
+                            }
+                        },
+                        module_index=0,
+                    )
+            finally:
+                if previous_jobs_dir is None:
+                    del os.environ["JOBS_DIR"]
+                else:
+                    os.environ["JOBS_DIR"] = previous_jobs_dir
+
     def test_indexed_module_update_for_duplicates(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             previous_jobs_dir = os.environ.get("JOBS_DIR")

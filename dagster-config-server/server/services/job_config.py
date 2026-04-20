@@ -13,6 +13,50 @@ from .config import get_jobs_dir
 from .yaml_loader import load_config, save_config
 
 
+def _string_field(data: dict[str, Any], key: str, *, context: str) -> str:
+    value = data.get(key)
+    if not isinstance(value, str):
+        raise ValueError(f"{context}.{key} must be a string")
+    return value
+
+
+def _normalize_http_get_auth(auth_payload: object) -> dict[str, dict[str, str]]:
+    if auth_payload is None:
+        return {}
+    if not isinstance(auth_payload, dict):
+        raise ValueError("auth must be an object")
+
+    supported_modes = ("basic_auth", "bearer_token", "api_key")
+    normalized: dict[str, dict[str, str]] = {}
+
+    for mode in supported_modes:
+        raw_mode_data = auth_payload.get(mode)
+        if raw_mode_data is None:
+            continue
+        if not isinstance(raw_mode_data, dict):
+            raise ValueError(f"auth.{mode} must be an object")
+
+        if mode == "basic_auth":
+            normalized[mode] = {
+                "username": _string_field(raw_mode_data, "username", context="auth.basic_auth"),
+                "password": _string_field(raw_mode_data, "password", context="auth.basic_auth"),
+            }
+        elif mode == "bearer_token":
+            normalized[mode] = {
+                "token": _string_field(raw_mode_data, "token", context="auth.bearer_token"),
+            }
+        else:
+            normalized[mode] = {
+                "key": _string_field(raw_mode_data, "key", context="auth.api_key"),
+                "key_name": _string_field(raw_mode_data, "key_name", context="auth.api_key"),
+            }
+
+    if len(normalized) > 1:
+        raise ValueError("auth must define exactly one auth mode")
+
+    return normalized
+
+
 def _find_module_asset(
     data: dict[str, Any],
     module_name: str,
@@ -33,13 +77,21 @@ def _find_module_asset(
 
 def _update_http_get(data: dict[str, Any], payload: dict[str, Any], module_index: int | None) -> None:
     asset = _find_module_asset(data, "http_get", module_index)
+    params = asset.setdefault("params", {})
 
     if "endpoint" in payload:
-        asset.setdefault("params", {})["endpoint"] = payload.get("endpoint")
+        params["endpoint"] = payload.get("endpoint")
 
     if "params" in payload:
         new_params = key_value_list_to_dict(payload.get("params"), payload_name="params")
-        asset.setdefault("params", {})["params"] = new_params
+        params["params"] = new_params
+
+    if "auth" in payload:
+        auth = _normalize_http_get_auth(payload.get("auth"))
+        if auth:
+            params["auth"] = auth
+        else:
+            params.pop("auth", None)
 
 
 

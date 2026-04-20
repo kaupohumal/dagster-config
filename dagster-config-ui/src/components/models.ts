@@ -48,6 +48,28 @@ export interface SwapModulePayload {
   dryRun?: boolean;
 }
 
+export type HttpAuthType = 'none' | 'api_key' | 'basic_auth' | 'bearer_token';
+
+export interface HttpApiKeyAuth {
+  key: string;
+  key_name: string;
+}
+
+export interface HttpBasicAuth {
+  username: string;
+  password: string;
+}
+
+export interface HttpBearerTokenAuth {
+  token: string;
+}
+
+export interface HttpAuthPayload {
+  api_key?: HttpApiKeyAuth;
+  basic_auth?: HttpBasicAuth;
+  bearer_token?: HttpBearerTokenAuth;
+}
+
 export function createEmptyPair<K extends string, V extends string>(
   fields: PairFieldNames<K, V>,
 ): StringPair<K, V> {

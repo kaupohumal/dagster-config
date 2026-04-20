@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, TypedDict
 
@@ -231,10 +232,44 @@ def _remove_unused_resources(config: dict[str, Any], resource_types: set[str]) -
 
 def _module_params_with_defaults(module_name: str, raw_params: object) -> dict[str, Any]:
     defaults = MODULE_CATALOG[module_name]["default_params"]
-    params = dict(defaults)
+    params = deepcopy(defaults)
     if isinstance(raw_params, dict):
         params.update(raw_params)
     return params
+
+
+def _normalize_http_get_auth(auth: object) -> dict[str, dict[str, str]]:
+    if not isinstance(auth, dict):
+        return {}
+
+    normalized: dict[str, dict[str, str]] = {}
+
+    api_key = auth.get("api_key")
+    if isinstance(api_key, dict):
+        key = api_key.get("key")
+        key_name = api_key.get("key_name")
+        if isinstance(key, str) and isinstance(key_name, str):
+            normalized["api_key"] = {"key": key, "key_name": key_name}
+
+    basic_auth = auth.get("basic_auth")
+    if isinstance(basic_auth, dict):
+        username = basic_auth.get("username")
+        password = basic_auth.get("password")
+        if isinstance(username, str) and isinstance(password, str):
+            normalized["basic_auth"] = {"username": username, "password": password}
+
+    bearer_token = auth.get("bearer_token")
+    if isinstance(bearer_token, dict):
+        token = bearer_token.get("token")
+        if isinstance(token, str):
+            normalized["bearer_token"] = {"token": token}
+
+    # Keep only one auth mode in deterministic order if malformed YAML contains several.
+    for mode in ("basic_auth", "bearer_token", "api_key"):
+        if mode in normalized:
+            return {mode: normalized[mode]}
+
+    return {}
 
 
 def _validate_asset_index(asset_index: int) -> int:
@@ -528,7 +563,7 @@ def swap_module_for_pipeline_asset(
             "message": "Asset already uses the requested module.",
         }
 
-    new_params = dict(MODULE_CATALOG[target_module]["default_params"])
+    new_params = deepcopy(MODULE_CATALOG[target_module]["default_params"])
     previous_params = asset.get("params")
     if preserve_compatible_params and isinstance(previous_params, dict):
         for key in list(new_params.keys()):
@@ -686,11 +721,13 @@ def get_http_get_data(
         key_field="key",
         value_field="value",
     )
+    auth = _normalize_http_get_auth(params.get("auth"))
 
     return {
         "module": "http_get",
         "endpoint": endpoint,
         "params": params_list,
+        "auth": auth,
     }
 
 
