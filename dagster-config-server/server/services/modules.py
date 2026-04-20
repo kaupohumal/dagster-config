@@ -11,6 +11,7 @@ from .assets import (
     find_resource_by_type,
 )
 from .config import get_jobs_dir
+from .pipeline_name_validation import validate_pipeline_name
 from .yaml_loader import load_config, save_config
 
 
@@ -383,13 +384,7 @@ def list_module_catalog() -> list[ModuleCatalogEntry]:
 
 
 def list_module_names_for_pipeline(pipeline_name: str, pipelines_dir: str | None = None) -> list[str]:
-
-    if not isinstance(pipeline_name, str) or not pipeline_name.strip():
-        raise ValueError("pipeline_name must be a non-empty string")
-
-    name = pipeline_name.strip()
-    if "/" in name or "\\" in name or name.startswith("."):
-        raise ValueError("Invalid pipeline name")
+    name = _validate_pipeline_name(pipeline_name)
 
     yaml_path = str(Path(pipelines_dir or get_jobs_dir()) / f"{name}.yaml")
     config = load_config(yaml_path)
@@ -416,14 +411,7 @@ def list_module_entries_for_pipeline(
 
 
 def _validate_pipeline_name(pipeline_name: str) -> str:
-    if not isinstance(pipeline_name, str) or not pipeline_name.strip():
-        raise ValueError("pipeline_name must be a non-empty string")
-
-    name = pipeline_name.strip()
-    if "/" in name or "\\" in name or name.startswith("."):
-        raise ValueError("Invalid pipeline name")
-
-    return name
+    return validate_pipeline_name(pipeline_name)
 
 
 def _validate_module_index(module_index: int | None) -> int | None:

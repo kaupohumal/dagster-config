@@ -23,7 +23,16 @@
         </q-card-section>
 
         <q-card-section class="q-gutter-md">
-          <q-input v-model="pipelineName" label="Pipeline name" autofocus />
+          <q-input
+            v-model="pipelineName"
+            label="Pipeline name"
+            autofocus
+            :error="Boolean(pipelineNameErrorForDisplay)"
+            :error-message="pipelineNameErrorForDisplay ?? undefined"
+            hint="Use letters, numbers, and underscores. Python keywords are not allowed."
+            persistent-hint
+            @blur="pipelineNameTouched = true"
+          />
 
           <div class="text-subtitle2">Modules (ordered)</div>
 
@@ -85,7 +94,15 @@ const moduleCatalog = ref<ModuleCatalogEntry[]>([]);
 const isCreateDialogOpen = ref(false);
 const isCreating = ref(false);
 const pipelineName = ref('');
+const pipelineNameTouched = ref(false);
 const moduleSelections = ref<string[]>([]);
+const dagsterPipelineNamePattern = /^[A-Za-z0-9_]+$/;
+const pythonKeywords = new Set([
+  'False', 'None', 'True', 'and', 'as', 'assert', 'async', 'await', 'break', 'class',
+  'continue', 'def', 'del', 'elif', 'else', 'except', 'finally', 'for', 'from', 'global',
+  'if', 'import', 'in', 'is', 'lambda', 'nonlocal', 'not', 'or', 'pass', 'raise', 'return',
+  'try', 'while', 'with', 'yield', 'match', 'case',
+]);
 
 const moduleOptions = computed(() =>
   moduleCatalog.value.map((entry) => ({
@@ -94,9 +111,29 @@ const moduleOptions = computed(() =>
   })),
 );
 
+const pipelineNameValidationError = computed(() => {
+  const normalized = pipelineName.value.trim();
+  if (!normalized) return 'Pipeline name is required.';
+  if (!dagsterPipelineNamePattern.test(normalized)) {
+    return 'Pipeline name must contain only letters, numbers, and underscores.';
+  }
+  if (pythonKeywords.has(normalized)) {
+    return 'Pipeline name cannot be a Python keyword.';
+  }
+  return null;
+});
+
+const pipelineNameErrorForDisplay = computed(() => {
+  const normalized = pipelineName.value.trim();
+  if (!normalized && !pipelineNameTouched.value) {
+    return null;
+  }
+  return pipelineNameValidationError.value;
+});
+
 const canCreate = computed(() => {
   if (isCreating.value) return false;
-  if (!pipelineName.value.trim()) return false;
+  if (pipelineNameValidationError.value) return false;
   if (moduleSelections.value.length === 0) return false;
   return moduleSelections.value.every((moduleName) => moduleName.trim().length > 0);
 });
@@ -130,6 +167,7 @@ const getModuleCatalog = async () => {
 
 const openCreateDialog = () => {
   pipelineName.value = '';
+  pipelineNameTouched.value = false;
   const firstModule = moduleCatalog.value.at(0)?.module;
   moduleSelections.value = firstModule ? [firstModule] : [];
   isCreateDialogOpen.value = true;

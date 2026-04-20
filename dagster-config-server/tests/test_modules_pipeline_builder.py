@@ -54,6 +54,35 @@ class PipelineBuilderTests(unittest.TestCase):
             self.assertEqual(assets[2]["module"], "send_to_arcgis")
             self.assertTrue(isinstance(config.get("resources"), list) and len(config["resources"]) == 1)
 
+    def test_create_pipeline_rejects_invalid_name_characters(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with self.assertRaises(ValueError):
+                create_pipeline_from_modules(
+                    pipeline_name="invalid-name",
+                    module_specs=["http_get"],
+                    pipelines_dir=tmpdir,
+                )
+
+    def test_create_pipeline_rejects_python_keyword_name(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with self.assertRaises(ValueError):
+                create_pipeline_from_modules(
+                    pipeline_name="for",
+                    module_specs=["http_get"],
+                    pipelines_dir=tmpdir,
+                )
+
+    def test_create_pipeline_allows_dagster_alphanumeric_name(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = create_pipeline_from_modules(
+                pipeline_name="2fast_pipeline",
+                module_specs=["http_get"],
+                pipelines_dir=tmpdir,
+            )
+
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["pipeline"], "2fast_pipeline")
+
     def test_list_module_entries_for_pipeline(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             create_pipeline_from_modules(

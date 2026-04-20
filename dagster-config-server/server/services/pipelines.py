@@ -5,6 +5,7 @@ import re
 from typing import Any
 
 from .config import get_jobs_dir
+from .pipeline_name_validation import validate_pipeline_name
 from .yaml_loader import load_config, save_config
 
 
@@ -33,14 +34,7 @@ def list_pipeline_names(dir_path: str | None = None) -> list[str]:
 
 
 def _validate_pipeline_name(pipeline_name: str) -> str:
-    if not isinstance(pipeline_name, str) or not pipeline_name.strip():
-        raise ValueError("pipeline_name must be a non-empty string")
-
-    name = pipeline_name.strip()
-    if "/" in name or "\\" in name or name.startswith("."):
-        raise ValueError("Invalid pipeline name")
-
-    return name
+    return validate_pipeline_name(pipeline_name)
 
 
 def _get_pipeline_path(pipeline_name: str, pipelines_dir: str | None = None) -> Path:
@@ -105,7 +99,7 @@ def _validate_cron_expression(cron: str) -> str:
         raise ValueError("cron must be a non-empty string")
 
     normalized = cron.strip()
-    if not re.fullmatch(r"[0-9\*/,\-\s]+", normalized):
+    if not re.fullmatch(r"[0-9*/,\-\s]+", normalized):
         raise ValueError("cron contains unsupported characters")
 
     parts = normalized.split()
