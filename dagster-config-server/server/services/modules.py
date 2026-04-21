@@ -239,31 +239,38 @@ def _module_params_with_defaults(module_name: str, raw_params: object) -> dict[s
     return params
 
 
-def _normalize_http_get_auth(auth: object) -> dict[str, dict[str, str]]:
+def _normalize_http_get_auth(auth: object) -> dict[str, dict[str, Any]]:
     if not isinstance(auth, dict):
         return {}
 
-    normalized: dict[str, dict[str, str]] = {}
+    normalized: dict[str, dict[str, Any]] = {}
 
     api_key = auth.get("api_key")
     if isinstance(api_key, dict):
-        key = api_key.get("key")
         key_name = api_key.get("key_name")
-        if isinstance(key, str) and isinstance(key_name, str):
-            normalized["api_key"] = {"key": key, "key_name": key_name}
+        key = api_key.get("key")
+        if isinstance(key_name, str):
+            normalized["api_key"] = {
+                "key_name": key_name,
+                "keySet": isinstance(key, str) and bool(key.strip()),
+            }
 
     basic_auth = auth.get("basic_auth")
     if isinstance(basic_auth, dict):
         username = basic_auth.get("username")
         password = basic_auth.get("password")
-        if isinstance(username, str) and isinstance(password, str):
-            normalized["basic_auth"] = {"username": username, "password": password}
+        if isinstance(username, str):
+            normalized["basic_auth"] = {
+                "username": username,
+                "passwordSet": isinstance(password, str) and bool(password.strip()),
+            }
 
     bearer_token = auth.get("bearer_token")
     if isinstance(bearer_token, dict):
         token = bearer_token.get("token")
-        if isinstance(token, str):
-            normalized["bearer_token"] = {"token": token}
+        normalized["bearer_token"] = {
+            "tokenSet": isinstance(token, str) and bool(token.strip()),
+        }
 
     # Keep only one auth mode in deterministic order if malformed YAML contains several.
     for mode in ("basic_auth", "bearer_token", "api_key"):

@@ -51,23 +51,43 @@ export interface SwapModulePayload {
 export type HttpAuthType = 'none' | 'api_key' | 'basic_auth' | 'bearer_token';
 
 export interface HttpApiKeyAuth {
-  key: string;
+  key?: string;
   key_name: string;
 }
 
 export interface HttpBasicAuth {
   username: string;
-  password: string;
+  password?: string;
 }
 
 export interface HttpBearerTokenAuth {
-  token: string;
+  token?: string;
 }
 
 export interface HttpAuthPayload {
   api_key?: HttpApiKeyAuth;
   basic_auth?: HttpBasicAuth;
   bearer_token?: HttpBearerTokenAuth;
+}
+
+export interface HttpApiKeyAuthResponse {
+  key_name: string;
+  keySet: boolean;
+}
+
+export interface HttpBasicAuthResponse {
+  username: string;
+  passwordSet: boolean;
+}
+
+export interface HttpBearerTokenAuthResponse {
+  tokenSet: boolean;
+}
+
+export interface HttpAuthResponse {
+  api_key?: HttpApiKeyAuthResponse;
+  basic_auth?: HttpBasicAuthResponse;
+  bearer_token?: HttpBearerTokenAuthResponse;
 }
 
 export function createEmptyPair<K extends string, V extends string>(

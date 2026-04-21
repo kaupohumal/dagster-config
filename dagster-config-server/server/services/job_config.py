@@ -20,41 +20,73 @@ def _string_field(data: dict[str, Any], key: str, *, context: str) -> str:
     return value
 
 
-def _normalize_http_get_auth(auth_payload: object) -> dict[str, dict[str, str]]:
+def _normalize_http_get_auth(
+    auth_payload: object,
+    existing_auth: object,
+) -> dict[str, dict[str, str]]:
     if auth_payload is None:
         return {}
     if not isinstance(auth_payload, dict):
         raise ValueError("auth must be an object")
 
     supported_modes = ("basic_auth", "bearer_token", "api_key")
-    normalized: dict[str, dict[str, str]] = {}
+    selected_modes: list[str] = [mode for mode in supported_modes if auth_payload.get(mode) is not None]
 
-    for mode in supported_modes:
-        raw_mode_data = auth_payload.get(mode)
-        if raw_mode_data is None:
-            continue
-        if not isinstance(raw_mode_data, dict):
-            raise ValueError(f"auth.{mode} must be an object")
-
-        if mode == "basic_auth":
-            normalized[mode] = {
-                "username": _string_field(raw_mode_data, "username", context="auth.basic_auth"),
-                "password": _string_field(raw_mode_data, "password", context="auth.basic_auth"),
-            }
-        elif mode == "bearer_token":
-            normalized[mode] = {
-                "token": _string_field(raw_mode_data, "token", context="auth.bearer_token"),
-            }
-        else:
-            normalized[mode] = {
-                "key": _string_field(raw_mode_data, "key", context="auth.api_key"),
-                "key_name": _string_field(raw_mode_data, "key_name", context="auth.api_key"),
-            }
-
-    if len(normalized) > 1:
+    if len(selected_modes) > 1:
         raise ValueError("auth must define exactly one auth mode")
+    if len(selected_modes) == 0:
+        return {}
 
-    return normalized
+    mode = selected_modes[0]
+    raw_mode_data = auth_payload.get(mode)
+    if not isinstance(raw_mode_data, dict):
+        raise ValueError(f"auth.{mode} must be an object")
+
+    previous_mode_data: dict[str, Any] = {}
+    if isinstance(existing_auth, dict):
+        existing_mode_data = existing_auth.get(mode)
+        if isinstance(existing_mode_data, dict):
+            previous_mode_data = existing_mode_data
+
+    if mode == "basic_auth":
+        username = _string_field(raw_mode_data, "username", context="auth.basic_auth")
+        password = raw_mode_data.get("password")
+        if password is None:
+            password_value = previous_mode_data.get("password")
+        else:
+            if not isinstance(password, str):
+                raise ValueError("auth.basic_auth.password must be a string")
+            password_value = password
+
+        if not isinstance(password_value, str):
+            password_value = ""
+        return {"basic_auth": {"username": username, "password": password_value}}
+
+    if mode == "bearer_token":
+        token = raw_mode_data.get("token")
+        if token is None:
+            token_value = previous_mode_data.get("token")
+        else:
+            if not isinstance(token, str):
+                raise ValueError("auth.bearer_token.token must be a string")
+            token_value = token
+
+        if not isinstance(token_value, str):
+            token_value = ""
+        return {"bearer_token": {"token": token_value}}
+
+    key_name = _string_field(raw_mode_data, "key_name", context="auth.api_key")
+    key = raw_mode_data.get("key")
+    if key is None:
+        key_value = previous_mode_data.get("key")
+    else:
+        if not isinstance(key, str):
+            raise ValueError("auth.api_key.key must be a string")
+        key_value = key
+
+    if not isinstance(key_value, str):
+        key_value = ""
+    return {"api_key": {"key": key_value, "key_name": key_name}}
 
 
 def _find_module_asset(
@@ -87,7 +119,7 @@ def _update_http_get(data: dict[str, Any], payload: dict[str, Any], module_index
         params["params"] = new_params
 
     if "auth" in payload:
-        auth = _normalize_http_get_auth(payload.get("auth"))
+        auth = _normalize_http_get_auth(payload.get("auth"), params.get("auth"))
         if auth:
             params["auth"] = auth
         else:

@@ -285,7 +285,7 @@ class PipelineBuilderTests(unittest.TestCase):
             self.assertEqual(first["endpoint"], "https://one.example")
             self.assertEqual(second["endpoint"], "https://two.example")
 
-    def test_http_get_auth_round_trip(self) -> None:
+    def test_http_get_auth_is_write_only_in_module_data(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             previous_jobs_dir = os.environ.get("JOBS_DIR")
             os.environ["JOBS_DIR"] = tmpdir
@@ -317,9 +317,113 @@ class PipelineBuilderTests(unittest.TestCase):
                     module_name="http_get",
                     payload={
                         "auth": {
+                            "basic_auth": {
+                                "username": "updated-user",
+                            }
+                        }
+                    },
+                    module_index=0,
+                )
+
+                update_module_config(
+                    pipeline_name="http_auth_pipeline",
+                    module_name="http_get",
+                    payload={
+                        "auth": {
                             "api_key": {
                                 "key": "{{ env.TIMESERIES_API_KEY }}",
                                 "key_name": "api_key",
+                            }
+                        }
+                    },
+                    module_index=0,
+                )
+
+                api_key_module_data = get_module_data(
+                    "http_auth_pipeline", "http_get", module_index=0
+                )
+
+                update_module_config(
+                    pipeline_name="http_auth_pipeline",
+                    module_name="http_get",
+                    payload={
+                        "auth": {
+                            "bearer_token": {
+                                "token": "token-value",
+                            }
+                        }
+                    },
+                    module_index=0,
+                )
+
+                bearer_module_data = get_module_data(
+                    "http_auth_pipeline", "http_get", module_index=0
+                )
+            finally:
+                if previous_jobs_dir is None:
+                    del os.environ["JOBS_DIR"]
+                else:
+                    os.environ["JOBS_DIR"] = previous_jobs_dir
+
+            self.assertEqual(
+                module_data["auth"],
+                {"basic_auth": {"username": "service-user", "passwordSet": True}},
+            )
+            self.assertNotIn("password", module_data["auth"]["basic_auth"])
+            self.assertEqual(
+                api_key_module_data["auth"],
+                {"api_key": {"key_name": "api_key", "keySet": True}},
+            )
+            self.assertNotIn("key", api_key_module_data["auth"]["api_key"])
+            self.assertEqual(
+                bearer_module_data["auth"],
+                {"bearer_token": {"tokenSet": True}},
+            )
+            self.assertNotIn("token", bearer_module_data["auth"]["bearer_token"])
+
+            config = load_config(str(Path(tmpdir) / "http_auth_pipeline.yaml"))
+            auth = config["jobs"][0]["assets"][0]["params"]["auth"]
+            self.assertEqual(
+                auth,
+                {
+                    "bearer_token": {
+                        "token": "token-value",
+                    }
+                },
+            )
+
+    def test_http_get_auth_preserves_secret_on_partial_update(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            previous_jobs_dir = os.environ.get("JOBS_DIR")
+            os.environ["JOBS_DIR"] = tmpdir
+            create_pipeline_from_modules(
+                pipeline_name="http_auth_partial_pipeline",
+                module_specs=["http_get"],
+                pipelines_dir=tmpdir,
+            )
+
+            try:
+                update_module_config(
+                    pipeline_name="http_auth_partial_pipeline",
+                    module_name="http_get",
+                    payload={
+                        "auth": {
+                            "api_key": {
+                                "key_name": "api_key",
+                                "key": "SECRET",
+                            }
+                        }
+                    },
+                    module_index=0,
+                )
+
+                update_module_config(
+                    pipeline_name="http_auth_partial_pipeline",
+                    module_name="http_get",
+                    payload={
+                        "auth": {
+                            "api_key": {
+                                "key_name": "x-api-key",
                             }
                         }
                     },
@@ -331,22 +435,10 @@ class PipelineBuilderTests(unittest.TestCase):
                 else:
                     os.environ["JOBS_DIR"] = previous_jobs_dir
 
-            self.assertEqual(
-                module_data["auth"],
-                {"basic_auth": {"username": "service-user", "password": "service-password"}},
-            )
-
-            config = load_config(str(Path(tmpdir) / "http_auth_pipeline.yaml"))
+            config = load_config(str(Path(tmpdir) / "http_auth_partial_pipeline.yaml"))
             auth = config["jobs"][0]["assets"][0]["params"]["auth"]
-            self.assertEqual(
-                auth,
-                {
-                    "api_key": {
-                        "key": "{{ env.TIMESERIES_API_KEY }}",
-                        "key_name": "api_key",
-                    }
-                },
-            )
+            self.assertEqual(auth["api_key"]["key"], "SECRET")
+            self.assertEqual(auth["api_key"]["key_name"], "x-api-key")
 
     def test_http_get_auth_rejects_multiple_modes(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
