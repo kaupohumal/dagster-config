@@ -5,16 +5,20 @@
       <q-btn color="primary" label="Create pipeline" @click="openCreateDialog" />
     </div>
 
-    <q-list class="q-mt-lg">
-      <q-item
-        v-for="(pipeline) in pipelines"
-        :key="pipeline"
-        clickable
-        @click="router.push({ name: 'pipelineDetails', params: { pipelineName: pipeline } })"
-      >
-        <q-item-section>{{ pipeline }}</q-item-section>
-      </q-item>
-    </q-list>
+<q-list v-if="pipelines.length > 0" class="q-mt-lg">
+  <q-item
+    v-for="(pipeline) in pipelines"
+    :key="pipeline"
+    clickable
+    @click="router.push({ name: 'pipelineDetails', params: { pipelineName: pipeline } })"
+  >
+    <q-item-section>{{ pipeline }}</q-item-section>
+  </q-item>
+</q-list>
+
+<div v-else class="q-mt-lg text-grey-7">
+  No pipelines found. Create one to get started
+</div>
 
     <q-dialog v-model="isCreateDialogOpen">
       <q-card style="min-width: 520px; max-width: 90vw">
