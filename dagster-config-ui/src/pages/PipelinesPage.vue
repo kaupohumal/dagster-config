@@ -87,8 +87,9 @@ import { computed, onMounted, ref } from 'vue';
 import { api } from 'boot/axios';
 import { useRouter } from 'vue-router';
 import { useQuasar } from 'quasar';
-import type { ModuleCatalogEntry } from 'components/models';
+import type { CreatePipelinePayload, ModuleCatalogEntry } from 'components/models';
 import { getApiErrorMessage } from '../utils/errors';
+import { getPipelineNameValidationError } from '../utils/pipelineNames';
 
 const router = useRouter();
 const $q = useQuasar();
@@ -100,13 +101,6 @@ const isCreating = ref(false);
 const pipelineName = ref('');
 const pipelineNameTouched = ref(false);
 const moduleSelections = ref<string[]>([]);
-const dagsterPipelineNamePattern = /^[A-Za-z0-9_]+$/;
-const pythonKeywords = new Set([
-  'False', 'None', 'True', 'and', 'as', 'assert', 'async', 'await', 'break', 'class',
-  'continue', 'def', 'del', 'elif', 'else', 'except', 'finally', 'for', 'from', 'global',
-  'if', 'import', 'in', 'is', 'lambda', 'nonlocal', 'not', 'or', 'pass', 'raise', 'return',
-  'try', 'while', 'with', 'yield', 'match', 'case',
-]);
 
 const moduleOptions = computed(() =>
   moduleCatalog.value.map((entry) => ({
@@ -116,15 +110,7 @@ const moduleOptions = computed(() =>
 );
 
 const pipelineNameValidationError = computed(() => {
-  const normalized = pipelineName.value.trim();
-  if (!normalized) return 'Pipeline name is required.';
-  if (!dagsterPipelineNamePattern.test(normalized)) {
-    return 'Pipeline name must contain only letters, numbers, and underscores.';
-  }
-  if (pythonKeywords.has(normalized)) {
-    return 'Pipeline name cannot be a Python keyword.';
-  }
-  return null;
+  return getPipelineNameValidationError(pipelineName.value);
 });
 
 const pipelineNameErrorForDisplay = computed(() => {
@@ -192,10 +178,11 @@ const createPipeline = async () => {
 
   try {
     const normalizedName = pipelineName.value.trim();
-    await api.post('/pipelines', {
+    const payload: CreatePipelinePayload = {
       pipelineName: normalizedName,
       modules: moduleSelections.value,
-    });
+    };
+    await api.post('/pipelines', payload);
 
     $q.notify({
       type: 'positive',

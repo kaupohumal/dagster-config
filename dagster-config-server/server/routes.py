@@ -13,7 +13,7 @@ from .services.modules import (
     remove_module_from_pipeline,
     swap_module_for_pipeline_asset,
 )
-from .services.pipelines import get_pipeline_schedule, list_pipeline_names, set_pipeline_schedule
+from .services.pipelines import copy_pipeline, get_pipeline_schedule, list_pipeline_names, set_pipeline_schedule
 from .services.modules import get_module_data as get_module_data_service
 from .services.run_config import apply_arcgis_resource_config, apply_minio_resource_config
 
@@ -128,6 +128,34 @@ def create_pipeline():
         return jsonify({"ok": False, "error": str(e)}), 500
     except Exception as e:
         return jsonify({"ok": False, "error": f"Failed to create pipeline: {e}"}), 500
+
+    return jsonify(result), 201
+
+
+@api.post("/pipelines/<pipeline_name>/copy")
+def copy_pipeline_route(pipeline_name: str):
+    payload = request.get_json(silent=True) or {}
+
+    target_pipeline_name = payload.get("targetPipelineName") if isinstance(payload, dict) else None
+
+    if not isinstance(target_pipeline_name, str) or not target_pipeline_name.strip():
+        return jsonify({"ok": False, "error": "payload must include 'targetPipelineName' (string)."}), 400
+
+    try:
+        result = copy_pipeline(
+            source_pipeline_name=pipeline_name,
+            target_pipeline_name=target_pipeline_name,
+        )
+    except FileExistsError as e:
+        return jsonify({"ok": False, "error": str(e)}), 409
+    except FileNotFoundError as e:
+        return jsonify({"ok": False, "error": str(e)}), 404
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    except LookupError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Failed to copy pipeline: {e}"}), 500
 
     return jsonify(result), 201
 

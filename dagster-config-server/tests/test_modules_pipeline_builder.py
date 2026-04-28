@@ -17,6 +17,7 @@ yaml_loader = importlib.import_module("server.services.yaml_loader")
 job_config_service = importlib.import_module("server.services.job_config")
 
 create_pipeline_from_modules = modules_service.create_pipeline_from_modules
+copy_pipeline = pipelines_service.copy_pipeline
 list_module_entries_for_pipeline = modules_service.list_module_entries_for_pipeline
 swap_module_for_pipeline_asset = modules_service.swap_module_for_pipeline_asset
 add_module_to_pipeline = modules_service.add_module_to_pipeline
@@ -82,6 +83,80 @@ class PipelineBuilderTests(unittest.TestCase):
 
             self.assertTrue(result["ok"])
             self.assertEqual(result["pipeline"], "2fast_pipeline")
+
+    def test_copy_pipeline_preserves_schedule_resources_and_duplicate_modules(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            create_pipeline_from_modules(
+                pipeline_name="source_pipeline",
+                module_specs=[
+                    {"module": "http_get", "params": {"endpoint": "https://one.example"}},
+                    {"module": "write_to_csv", "params": {"file_name": "first.csv"}},
+                    {"module": "write_to_csv", "params": {"file_name": "second.csv"}},
+                ],
+                pipelines_dir=tmpdir,
+            )
+
+            set_pipeline_schedule(
+                pipeline_name="source_pipeline",
+                cron="*/5 * * * *",
+                pipelines_dir=tmpdir,
+            )
+
+            copied = copy_pipeline(
+                source_pipeline_name="source_pipeline",
+                target_pipeline_name="copied_pipeline",
+                pipelines_dir=tmpdir,
+            )
+
+            self.assertTrue(copied["ok"])
+            self.assertEqual(copied["pipeline"], "copied_pipeline")
+            self.assertEqual(copied["sourcePipeline"], "source_pipeline")
+
+            source_config = load_config(str(Path(tmpdir) / "source_pipeline.yaml"))
+            copied_config = load_config(str(Path(tmpdir) / "copied_pipeline.yaml"))
+
+            self.assertEqual(copied_config["jobs"][0]["job"], "copied_pipeline")
+            self.assertEqual(
+                [asset["module"] for asset in copied_config["jobs"][0]["assets"]],
+                ["http_get", "write_to_csv", "write_to_csv"],
+            )
+            self.assertEqual(copied_config["jobs"][0]["schedule"], {"cron": "*/5 * * * *"})
+            self.assertEqual(copied_config.get("resources"), source_config.get("resources"))
+
+    def test_copy_pipeline_rejects_invalid_target_name(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            create_pipeline_from_modules(
+                pipeline_name="source_pipeline",
+                module_specs=["http_get"],
+                pipelines_dir=tmpdir,
+            )
+
+            with self.assertRaises(ValueError):
+                copy_pipeline(
+                    source_pipeline_name="source_pipeline",
+                    target_pipeline_name="invalid-name",
+                    pipelines_dir=tmpdir,
+                )
+
+    def test_copy_pipeline_rejects_existing_target(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            create_pipeline_from_modules(
+                pipeline_name="source_pipeline",
+                module_specs=["http_get"],
+                pipelines_dir=tmpdir,
+            )
+            create_pipeline_from_modules(
+                pipeline_name="existing_pipeline",
+                module_specs=["json_mapper"],
+                pipelines_dir=tmpdir,
+            )
+
+            with self.assertRaises(FileExistsError):
+                copy_pipeline(
+                    source_pipeline_name="source_pipeline",
+                    target_pipeline_name="existing_pipeline",
+                    pipelines_dir=tmpdir,
+                )
 
     def test_list_module_entries_for_pipeline(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

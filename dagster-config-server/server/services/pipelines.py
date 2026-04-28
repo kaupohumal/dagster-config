@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from pathlib import Path
 import re
 from typing import Any
@@ -160,6 +161,33 @@ def set_pipeline_schedule(
         "pipeline": name,
         "hasSchedule": normalized_cron is not None,
         "cron": normalized_cron,
+    }
+
+
+def copy_pipeline(
+    source_pipeline_name: str,
+    target_pipeline_name: str,
+    pipelines_dir: str | None = None,
+) -> dict[str, Any]:
+    source_name = _validate_pipeline_name(source_pipeline_name)
+    target_name = _validate_pipeline_name(target_pipeline_name)
+
+    source_path = _get_pipeline_path(source_name, pipelines_dir)
+    target_path = _get_pipeline_path(target_name, pipelines_dir)
+
+    config = deepcopy(load_config(str(source_path)))
+    primary_job = _get_primary_job(config)
+    primary_job["job"] = target_name
+
+    if target_path.exists():
+        raise FileExistsError(f"Pipeline already exists: {target_name}")
+
+    save_config(str(target_path), config)
+    return {
+        "ok": True,
+        "pipeline": target_name,
+        "sourcePipeline": source_name,
+        "copied": True,
     }
 
 

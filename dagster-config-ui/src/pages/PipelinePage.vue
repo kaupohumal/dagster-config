@@ -10,6 +10,13 @@
         :disable="isLaunching"
         @click="runPipeline"
       />
+      <q-btn
+        outline
+        color="primary"
+        label="Copy"
+        :disable="isCopyingPipeline"
+        @click="openCopyDialog"
+      />
     </div>
 
     <div v-if="activeRunId" class="q-mt-md q-ml-xs row items-center q-gutter-sm">
@@ -126,6 +133,38 @@
       </q-card>
     </q-dialog>
 
+    <q-dialog v-model="isCopyDialogOpen">
+      <q-card style="min-width: 440px; max-width: 90vw">
+        <q-card-section>
+          <div class="text-h6">Copy pipeline</div>
+        </q-card-section>
+
+        <q-card-section class="q-gutter-md">
+          <q-input
+            v-model="copyTargetPipelineName"
+            label="New pipeline name"
+            autofocus
+            :error="Boolean(copyTargetPipelineNameErrorForDisplay)"
+            :error-message="copyTargetPipelineNameErrorForDisplay ?? undefined"
+            hint="Use letters, numbers, and underscores. Python keywords are not allowed."
+            persistent-hint
+            @blur="copyTargetPipelineNameTouched = true"
+          />
+        </q-card-section>
+
+        <q-card-actions align="right">
+          <q-btn flat label="Cancel" @click="isCopyDialogOpen = false" />
+          <q-btn
+            color="primary"
+            label="Copy"
+            :loading="isCopyingPipeline"
+            :disable="!canCopyPipeline"
+            @click="copyPipeline"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
   </q-page>
 </template>
 
@@ -136,11 +175,14 @@ import {api} from "boot/axios";
 import AssetConfigWrapper from "components/AssetConfigWrapper.vue";
 import PipelineScheduleConfig from 'components/PipelineScheduleConfig.vue';
 import {useRoute} from "vue-router";
+import { useRouter } from 'vue-router';
 import {useQuasar} from "quasar";
 import {getApiErrorMessage} from "../utils/errors";
-import type { ModuleCatalogEntry, ModuleEntry, PipelineSchedule } from 'components/models';
+import type { CopyPipelinePayload, ModuleCatalogEntry, ModuleEntry, PipelineSchedule, SwapModulePayload } from 'components/models';
+import { getPipelineNameValidationError } from '../utils/pipelineNames';
 
 const route = useRoute();
+const router = useRouter();
 const $q = useQuasar();
 const pipelineName = computed(() => route.params.pipelineName as string);
 const moduleEntries = ref<ModuleEntry[]>([]);
@@ -149,10 +191,14 @@ const isSwappingByIndex = ref<Record<number, boolean>>({});
 const isRemovingByIndex = ref<Record<number, boolean>>({});
 const isAddDialogOpen = ref(false);
 const isRemoveDialogOpen = ref(false);
+const isCopyDialogOpen = ref(false);
 const pendingRemoveIndex = ref<number | null>(null);
 const isAddingModule = ref(false);
 const addInsertIndex = ref(0);
 const addTargetModule = ref('');
+const copyTargetPipelineName = ref('');
+const copyTargetPipelineNameTouched = ref(false);
+const isCopyingPipeline = ref(false);
 const isLaunching = ref(false);
 const activeRunId = ref<string | null>(null);
 const activeRunUrl = ref<string | null>(null);
@@ -175,6 +221,23 @@ const moduleOptions = computed(() => moduleCatalog.value.map((entry) => ({
   value: entry.module,
 })));
 
+const copyTargetPipelineNameValidationError = computed(() => {
+  return getPipelineNameValidationError(copyTargetPipelineName.value);
+});
+
+const copyTargetPipelineNameErrorForDisplay = computed(() => {
+  const normalized = copyTargetPipelineName.value.trim();
+  if (!normalized && !copyTargetPipelineNameTouched.value) {
+    return null;
+  }
+  return copyTargetPipelineNameValidationError.value;
+});
+
+const canCopyPipeline = computed(() => {
+  if (isCopyingPipeline.value) return false;
+  return !copyTargetPipelineNameValidationError.value;
+});
+
 const flowStyle = computed(() => {
   if (maxCardHeight.value === null) {
     return {};
@@ -196,6 +259,12 @@ const runStatusColor = computed(() => {
   }
   return "info";
 });
+
+const openCopyDialog = () => {
+  copyTargetPipelineName.value = `${pipelineName.value}_copy`;
+  copyTargetPipelineNameTouched.value = false;
+  isCopyDialogOpen.value = true;
+};
 
 onMounted(async () => {
   await Promise.all([getModules(), getModuleCatalog(), getSchedule()]);
@@ -368,6 +437,34 @@ const confirmRemoveModule = async () => {
   }
 };
 
+const copyPipeline = async () => {
+  isCopyingPipeline.value = true;
+
+  try {
+    const normalizedName = copyTargetPipelineName.value.trim();
+    const payload: CopyPipelinePayload = { targetPipelineName: normalizedName };
+    const response = await api.post(`/pipelines/${pipelineName.value}/copy`, payload);
+    const copiedPipelineName = typeof response.data?.pipeline === 'string' && response.data.pipeline.length > 0
+      ? response.data.pipeline
+      : normalizedName;
+
+    $q.notify({
+      type: 'positive',
+      message: `Copied pipeline to '${copiedPipelineName}'.`,
+    });
+
+    isCopyDialogOpen.value = false;
+    await router.push({ name: 'pipelineDetails', params: { pipelineName: copiedPipelineName } });
+  } catch (error: unknown) {
+    $q.notify({
+      type: 'negative',
+      message: getApiErrorMessage(error, 'Failed to copy pipeline.'),
+    });
+  } finally {
+    isCopyingPipeline.value = false;
+  }
+};
+
 const swapModule = async (index: number, value: unknown) => {
   if (typeof value !== 'string' || value.trim().length === 0) {
     return;
@@ -386,13 +483,14 @@ const swapModule = async (index: number, value: unknown) => {
   isSwappingByIndex.value[index] = true;
 
   try {
+    const payload: SwapModulePayload = {
+      targetModule,
+      preserveCompatibleParams: true,
+      dryRun: false,
+    };
     const response = await api.patch(
       `/pipelines/${pipelineName.value}/assets/${index}/module`,
-      {
-        targetModule,
-        preserveCompatibleParams: true,
-        dryRun: false,
-      },
+      payload,
     );
 
     const changed = Boolean(response.data?.changed);

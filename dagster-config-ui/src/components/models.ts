@@ -37,6 +37,10 @@ export interface CreatePipelinePayload {
   jobName?: string;
 }
 
+export interface CopyPipelinePayload {
+  targetPipelineName: string;
+}
+
 export interface PipelineSchedule {
   hasSchedule: boolean;
   cron: string | null;
