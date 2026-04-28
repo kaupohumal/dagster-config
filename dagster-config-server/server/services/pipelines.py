@@ -191,3 +191,17 @@ def copy_pipeline(
     }
 
 
+
+def delete_pipeline(pipeline_name: str, pipelines_dir: str | None = None) -> dict[str, Any]:
+    name = _validate_pipeline_name(pipeline_name)
+    yaml_path = _get_pipeline_path(name, pipelines_dir)
+
+    if not yaml_path.exists():
+        raise FileNotFoundError(f"Pipeline not found: {name}")
+    if not yaml_path.is_file():
+        raise ValueError(f"Pipeline path is not a file: {yaml_path}")
+
+    yaml_path.unlink()
+    return {"ok": True, "pipeline": name, "deleted": True}
+
+

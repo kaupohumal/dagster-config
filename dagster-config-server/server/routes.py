@@ -13,7 +13,13 @@ from .services.modules import (
     remove_module_from_pipeline,
     swap_module_for_pipeline_asset,
 )
-from .services.pipelines import copy_pipeline, get_pipeline_schedule, list_pipeline_names, set_pipeline_schedule
+from .services.pipelines import (
+    copy_pipeline,
+    get_pipeline_schedule,
+    list_pipeline_names,
+    set_pipeline_schedule,
+    delete_pipeline,
+)
 from .services.modules import get_module_data as get_module_data_service
 from .services.run_config import apply_arcgis_resource_config, apply_minio_resource_config
 
@@ -158,6 +164,21 @@ def copy_pipeline_route(pipeline_name: str):
         return jsonify({"ok": False, "error": f"Failed to copy pipeline: {e}"}), 500
 
     return jsonify(result), 201
+
+
+
+@api.delete("/pipelines/<pipeline_name>")
+def delete_pipeline_route(pipeline_name: str):
+    try:
+        result = delete_pipeline(pipeline_name)
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    except FileNotFoundError as e:
+        return jsonify({"ok": False, "error": str(e)}), 404
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Failed to delete pipeline: {e}"}), 500
+
+    return jsonify(result), 200
 
 
 @api.patch("/pipelines/<pipeline_name>/assets/<int:asset_index>/module")

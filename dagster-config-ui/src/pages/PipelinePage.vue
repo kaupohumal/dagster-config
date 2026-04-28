@@ -17,6 +17,13 @@
         :disable="isCopyingPipeline"
         @click="openCopyDialog"
       />
+      <q-btn
+        outline
+        color="negative"
+        label="Delete"
+        :disable="isDeletingPipeline"
+        @click="openDeleteDialog"
+      />
     </div>
 
     <div v-if="activeRunId" class="q-mt-md q-ml-xs row items-center q-gutter-sm">
@@ -165,6 +172,27 @@
       </q-card>
     </q-dialog>
 
+    <q-dialog v-model="isDeleteDialogOpen" persistent>
+      <q-card style="min-width: 380px; max-width: 90vw">
+        <q-card-section>
+          <div class="text-h6">Delete pipeline</div>
+        </q-card-section>
+        <q-card-section>
+          Are you sure you want to delete pipeline "{{ pipelineName }}"? This cannot be undone.
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat label="Cancel" @click="isDeleteDialogOpen = false" />
+          <q-btn
+            color="negative"
+            label="Delete"
+            :loading="isDeletingPipeline"
+            :disable="isDeletingPipeline"
+            @click="deletePipeline"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
   </q-page>
 </template>
 
@@ -194,6 +222,8 @@ const isRemoveDialogOpen = ref(false);
 const isCopyDialogOpen = ref(false);
 const pendingRemoveIndex = ref<number | null>(null);
 const isAddingModule = ref(false);
+const isDeleteDialogOpen = ref(false);
+const isDeletingPipeline = ref(false);
 const addInsertIndex = ref(0);
 const addTargetModule = ref('');
 const copyTargetPipelineName = ref('');
@@ -264,6 +294,35 @@ const openCopyDialog = () => {
   copyTargetPipelineName.value = `${pipelineName.value}_copy`;
   copyTargetPipelineNameTouched.value = false;
   isCopyDialogOpen.value = true;
+};
+
+const openDeleteDialog = () => {
+  isDeleteDialogOpen.value = true;
+};
+
+const deletePipeline = async () => {
+  isDeletingPipeline.value = true;
+
+  try {
+    await api.delete(`/pipelines/${pipelineName.value}`);
+
+    $q.notify({
+      type: 'positive',
+      message: `Deleted pipeline '${pipelineName.value}'.`,
+    });
+
+    // stop any polling and navigate back to list
+    stopStatusPolling();
+    await router.push({ name: 'pipelinesList' });
+  } catch (error: unknown) {
+    $q.notify({
+      type: 'negative',
+      message: getApiErrorMessage(error, 'Failed to delete pipeline.'),
+    });
+  } finally {
+    isDeletingPipeline.value = false;
+    isDeleteDialogOpen.value = false;
+  }
 };
 
 onMounted(async () => {
