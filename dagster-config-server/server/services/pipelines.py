@@ -153,7 +153,9 @@ def set_pipeline_schedule(
     if normalized_cron is None:
         job.pop("schedule", None)
     else:
-        job["schedule"] = {"cron": normalized_cron}
+        # When enabling a cron schedule, mark it explicitly active in the YAML
+        # so that the pipeline's schedule is enabled by default.
+        job["schedule"] = {"cron": normalized_cron, "active": True}
 
     save_config(str(yaml_path), config)
     return {

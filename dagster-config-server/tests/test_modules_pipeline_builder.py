@@ -120,7 +120,10 @@ class PipelineBuilderTests(unittest.TestCase):
                 [asset["module"] for asset in copied_config["jobs"][0]["assets"]],
                 ["http_get", "write_to_csv", "write_to_csv"],
             )
-            self.assertEqual(copied_config["jobs"][0]["schedule"], {"cron": "*/5 * * * *"})
+            self.assertEqual(
+                copied_config["jobs"][0]["schedule"],
+                {"cron": "*/5 * * * *", "active": True},
+            )
             self.assertEqual(copied_config.get("resources"), source_config.get("resources"))
 
     def test_copy_pipeline_rejects_invalid_target_name(self) -> None:

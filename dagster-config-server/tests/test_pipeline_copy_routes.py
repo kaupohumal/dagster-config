@@ -74,7 +74,10 @@ class PipelineCopyRouteTests(unittest.TestCase):
                 [asset["module"] for asset in copied_config["jobs"][0]["assets"]],
                 ["http_get", "write_to_csv", "write_to_csv"],
             )
-            self.assertEqual(copied_config["jobs"][0]["schedule"], {"cron": "*/5 * * * *"})
+            self.assertEqual(
+                copied_config["jobs"][0]["schedule"],
+                {"cron": "*/5 * * * *", "active": True},
+            )
 
     def test_copy_pipeline_route_rejects_missing_target_name(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
