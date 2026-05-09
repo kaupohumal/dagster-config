@@ -3,11 +3,11 @@ from __future__ import annotations
 from typing import Any
 
 from .assets import (
-    find_asset_by_module_and_entry_index,
-    find_asset_by_module,
     find_resource_by_type,
     key_value_list_to_dict,
     mappings_list_to_dict,
+    find_module_asset_or_error,
+    validate_module_index,
 )
 from .config import get_jobs_dir
 from .yaml_loader import load_config, save_config
@@ -89,26 +89,8 @@ def _normalize_http_get_auth(
     return {"api_key": {"key": key_value, "key_name": key_name}}
 
 
-def _find_module_asset(
-    data: dict[str, Any],
-    module_name: str,
-    module_index: int | None,
-) -> dict[str, Any]:
-    if module_index is None:
-        asset = find_asset_by_module(data, module_name)
-    else:
-        asset = find_asset_by_module_and_entry_index(data, module_name, module_index)
-    if not asset:
-        if module_index is None:
-            raise LookupError(f"No asset with module '{module_name}' found.")
-        raise LookupError(
-            f"No asset with module '{module_name}' found at index {module_index}."
-        )
-    return asset
-
-
 def _update_http_get(data: dict[str, Any], payload: dict[str, Any], module_index: int | None) -> None:
-    asset = _find_module_asset(data, "http_get", module_index)
+    asset = find_module_asset_or_error(data, "http_get", module_index)
     params = asset.setdefault("params", {})
 
     if "endpoint" in payload:
@@ -128,7 +110,7 @@ def _update_http_get(data: dict[str, Any], payload: dict[str, Any], module_index
 
 
 def _update_json_mapper(data: dict[str, Any], payload: dict[str, Any], module_index: int | None) -> None:
-    asset = _find_module_asset(data, "json_mapper", module_index)
+    asset = find_module_asset_or_error(data, "json_mapper", module_index)
 
     if "mappings" in payload:
         new_mappings = mappings_list_to_dict(payload.get("mappings"))
@@ -136,7 +118,7 @@ def _update_json_mapper(data: dict[str, Any], payload: dict[str, Any], module_in
 
 
 def _update_write_to_csv(data: dict[str, Any], payload: dict[str, Any], module_index: int | None) -> None:
-    asset = _find_module_asset(data, "write_to_csv", module_index)
+    asset = find_module_asset_or_error(data, "write_to_csv", module_index)
 
     if "fileName" in payload:
         asset.setdefault("params", {})["file_name"] = payload.get("fileName")
@@ -180,7 +162,7 @@ def _update_write_to_csv(data: dict[str, Any], payload: dict[str, Any], module_i
 def _update_transform_to_arcgis_format(
     data: dict[str, Any], payload: dict[str, Any], module_index: int | None
 ) -> None:
-    asset = _find_module_asset(data, "transform_to_arcgis_format", module_index)
+    asset = find_module_asset_or_error(data, "transform_to_arcgis_format", module_index)
 
     if "lat" in payload:
         asset.setdefault("params", {})["lat"] = payload.get("lat")
@@ -192,7 +174,7 @@ def _update_transform_to_arcgis_format(
 def _update_send_to_arcgis(
     data: dict[str, Any], payload: dict[str, Any], module_index: int | None
 ) -> None:
-    asset = _find_module_asset(data, "send_to_arcgis", module_index)
+    asset = find_module_asset_or_error(data, "send_to_arcgis", module_index)
 
     if "layerName" in payload:
         asset.setdefault("params", {})["layer_name"] = payload.get("layerName")
@@ -222,9 +204,7 @@ def update_module_config(
     payload: dict[str, Any],
     module_index: int | None = None,
 ) -> dict[str, Any]:
-
-    if module_index is not None and (not isinstance(module_index, int) or module_index < 0):
-        raise ValueError("module_index must be a non-negative integer")
+    validate_module_index(module_index)
 
     jobs_dir = get_jobs_dir()
     yaml_file = jobs_dir.rstrip("/") + "/" + pipeline_name + '.yaml'

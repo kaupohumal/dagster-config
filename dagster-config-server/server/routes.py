@@ -9,7 +9,6 @@ from .services.modules import (
     create_pipeline_from_modules,
     list_module_catalog,
     list_module_entries_for_pipeline,
-    list_module_names_for_pipeline,
     remove_module_from_pipeline,
     swap_module_for_pipeline_asset,
 )
@@ -26,6 +25,54 @@ from .services.run_config import apply_arcgis_resource_config, apply_minio_resou
 api = Blueprint("api", __name__)
 
 
+def _module_data_response(
+    pipeline_name: str,
+    module_name: str,
+    module_index: int | None = None,
+):
+    try:
+        data = get_module_data_service(
+            pipeline_name,
+            module_name,
+            module_index=module_index,
+        )
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    except FileNotFoundError as e:
+        return jsonify({"ok": False, "error": str(e)}), 404
+    except LookupError as e:
+        return jsonify({"ok": False, "error": str(e)}), 404
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Failed to get module data: {e}"}), 500
+
+    return jsonify(data), 200
+
+
+def _module_update_response(
+    pipeline_name: str,
+    module_name: str,
+    payload: dict,
+    module_index: int | None = None,
+):
+    try:
+        resp = update_module_config(
+            pipeline_name,
+            module_name,
+            payload,
+            module_index=module_index,
+        )
+    except FileNotFoundError as e:
+        return jsonify({"ok": False, "error": str(e)}), 404
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    except LookupError as e:
+        return jsonify({"ok": False, "error": str(e)}), 404
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Failed to update YAML: {e}"}), 500
+
+    return jsonify(resp), 200
+
+
 @api.get("/pipelines")
 def get_pipeline_names():
     try:
@@ -38,20 +85,6 @@ def get_pipeline_names():
         return jsonify({"ok": False, "error": f"Failed to list pipelines: {e}"}), 500
 
     return jsonify(names), 200
-
-
-@api.get("/pipelines/<pipeline_name>/modules")
-def get_pipeline_modules(pipeline_name: str):
-    try:
-        modules = list_module_names_for_pipeline(pipeline_name)
-    except ValueError as e:
-        return jsonify({"ok": False, "error": str(e)}), 400
-    except FileNotFoundError as e:
-        return jsonify({"ok": False, "error": str(e)}), 404
-    except Exception as e:
-        return jsonify({"ok": False, "error": f"Failed to list modules: {e}"}), 500
-
-    return jsonify(modules), 200
 
 
 @api.get("/module-catalog")
@@ -259,77 +292,20 @@ def remove_pipeline_asset_module(pipeline_name: str, asset_index: int):
     return jsonify(result), 200
 
 
-@api.get("/pipelines/<pipeline_name>/modules/<module_name>")
-def get_module_data(pipeline_name: str, module_name: str):
-    try:
-        data = get_module_data_service(pipeline_name, module_name)
-    except ValueError as e:
-        return jsonify({"ok": False, "error": str(e)}), 400
-    except FileNotFoundError as e:
-        return jsonify({"ok": False, "error": str(e)}), 404
-    except LookupError as e:
-        return jsonify({"ok": False, "error": str(e)}), 404
-    except Exception as e:
-        return jsonify({"ok": False, "error": f"Failed to get module data: {e}"}), 500
-
-    return jsonify(data), 200
-
-
 @api.get("/pipelines/<pipeline_name>/modules/<module_name>/<int:module_index>")
 def get_module_data_by_index(pipeline_name: str, module_name: str, module_index: int):
-    try:
-        data = get_module_data_service(pipeline_name, module_name, module_index=module_index)
-    except ValueError as e:
-        return jsonify({"ok": False, "error": str(e)}), 400
-    except FileNotFoundError as e:
-        return jsonify({"ok": False, "error": str(e)}), 404
-    except LookupError as e:
-        return jsonify({"ok": False, "error": str(e)}), 404
-    except Exception as e:
-        return jsonify({"ok": False, "error": f"Failed to get module data: {e}"}), 500
-
-    return jsonify(data), 200
-
-
-@api.patch("/pipelines/<pipeline_name>/modules/<module_name>")
-def update_module_data(pipeline_name: str, module_name: str):
-    payload = request.get_json(silent=True) or {}
-
-    try:
-        resp = update_module_config(pipeline_name, module_name, payload)
-    except FileNotFoundError as e:
-        return jsonify({"ok": False, "error": str(e)}), 404
-    except ValueError as e:
-        return jsonify({"ok": False, "error": str(e)}), 400
-    except LookupError as e:
-        return jsonify({"ok": False, "error": str(e)}), 404
-    except Exception as e:
-        return jsonify({"ok": False, "error": f"Failed to update YAML: {e}"}), 500
-
-    return jsonify(resp), 200
+    return _module_data_response(pipeline_name, module_name, module_index=module_index)
 
 
 @api.patch("/pipelines/<pipeline_name>/modules/<module_name>/<int:module_index>")
 def update_module_data_by_index(pipeline_name: str, module_name: str, module_index: int):
     payload = request.get_json(silent=True) or {}
-
-    try:
-        resp = update_module_config(
-            pipeline_name,
-            module_name,
-            payload,
-            module_index=module_index,
-        )
-    except FileNotFoundError as e:
-        return jsonify({"ok": False, "error": str(e)}), 404
-    except ValueError as e:
-        return jsonify({"ok": False, "error": str(e)}), 400
-    except LookupError as e:
-        return jsonify({"ok": False, "error": str(e)}), 404
-    except Exception as e:
-        return jsonify({"ok": False, "error": f"Failed to update YAML: {e}"}), 500
-
-    return jsonify(resp), 200
+    return _module_update_response(
+        pipeline_name,
+        module_name,
+        payload,
+        module_index=module_index,
+    )
 
 
 @api.post("/pipelines/<pipeline_name>/run")

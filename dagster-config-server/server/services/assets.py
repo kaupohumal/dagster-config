@@ -52,6 +52,33 @@ def find_asset_by_module_and_entry_index(
     return asset
 
 
+def validate_module_index(module_index: int | None) -> int | None:
+    if module_index is None:
+        return None
+    if not isinstance(module_index, int) or module_index < 0:
+        raise ValueError("module_index must be a non-negative integer")
+    return module_index
+
+
+def find_module_asset_or_error(
+    config: dict[str, Any],
+    module_name: str,
+    module_index: int | None,
+) -> dict[str, Any]:
+    validate_module_index(module_index)
+
+    if module_index is None:
+        asset = find_asset_by_module(config, module_name)
+    else:
+        asset = find_asset_by_module_and_entry_index(config, module_name, module_index)
+
+    if not asset:
+        if module_index is None:
+            raise LookupError(f"No asset with module '{module_name}' found.")
+        raise LookupError(f"No asset with module '{module_name}' found at index {module_index}.")
+    return asset
+
+
 def find_resource_by_type(config: dict[str, Any], resource_type: str) -> dict[str, Any] | None:
 
     for resource in config.get("resources", []) or []:

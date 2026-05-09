@@ -6,9 +6,9 @@ from typing import Any, TypedDict
 
 from .assets import (
     dict_to_pair_list,
-    find_asset_by_module,
-    find_asset_by_module_and_entry_index,
     find_resource_by_type,
+    find_module_asset_or_error,
+    validate_module_index,
 )
 from .config import get_jobs_dir
 from .pipeline_name_validation import validate_pipeline_name
@@ -190,7 +190,7 @@ def _ensure_required_resources_for_module(config: dict[str, Any], module_name: s
     return added_resources
 
 
-def _pipeline_requires_resource_type(config: dict[str, Any], resource_type: str) -> bool:
+def pipeline_requires_resource_type(config: dict[str, Any], resource_type: str) -> bool:
     for asset in _get_assets(config):
         module_name = asset.get("module")
         if not isinstance(module_name, str):
@@ -220,7 +220,7 @@ def _remove_unused_resources(config: dict[str, Any], resource_types: set[str]) -
         if (
             isinstance(resource_type, str)
             and resource_type in resource_types
-            and not _pipeline_requires_resource_type(config, resource_type)
+            and not pipeline_requires_resource_type(config, resource_type)
         ):
             removed_resources.append(resource_type)
             continue
@@ -419,31 +419,6 @@ def list_module_entries_for_pipeline(
 
 def _validate_pipeline_name(pipeline_name: str) -> str:
     return validate_pipeline_name(pipeline_name)
-
-
-def _validate_module_index(module_index: int | None) -> int | None:
-    if module_index is None:
-        return None
-    if not isinstance(module_index, int) or module_index < 0:
-        raise ValueError("module_index must be a non-negative integer")
-    return module_index
-
-
-def _find_pipeline_module_asset(
-    config: dict[str, Any],
-    module_name: str,
-    module_index: int | None,
-) -> dict[str, Any]:
-    if module_index is None:
-        asset = find_asset_by_module(config, module_name)
-    else:
-        asset = find_asset_by_module_and_entry_index(config, module_name, module_index)
-
-    if not asset:
-        if module_index is None:
-            raise LookupError(f"No asset with module '{module_name}' found.")
-        raise LookupError(f"No asset with module '{module_name}' found at index {module_index}.")
-    return asset
 
 
 def create_pipeline_from_modules(
@@ -698,11 +673,11 @@ def get_http_get_data(
     pipeline_name: str, pipelines_dir: str | None = None, module_index: int | None = None
 ) -> dict[str, Any]:
     name = _validate_pipeline_name(pipeline_name)
-    _validate_module_index(module_index)
+    validate_module_index(module_index)
     yaml_path = str(Path(pipelines_dir or get_jobs_dir()) / f"{name}.yaml")
     config = load_config(yaml_path)
 
-    asset = _find_pipeline_module_asset(config, "http_get", module_index)
+    asset = find_module_asset_or_error(config, "http_get", module_index)
 
     params = asset.get("params") if isinstance(asset, dict) else None
     if not isinstance(params, dict):
@@ -730,11 +705,11 @@ def get_json_mapper_data(
     pipeline_name: str, pipelines_dir: str | None = None, module_index: int | None = None
 ) -> dict[str, Any]:
     name = _validate_pipeline_name(pipeline_name)
-    _validate_module_index(module_index)
+    validate_module_index(module_index)
     yaml_path = str(Path(pipelines_dir or get_jobs_dir()) / f"{name}.yaml")
     config = load_config(yaml_path)
 
-    asset = _find_pipeline_module_asset(config, "json_mapper", module_index)
+    asset = find_module_asset_or_error(config, "json_mapper", module_index)
 
     params = asset.get("params") if isinstance(asset, dict) else None
     if not isinstance(params, dict):
@@ -756,11 +731,11 @@ def get_write_to_csv_data(
     pipeline_name: str, pipelines_dir: str | None = None, module_index: int | None = None
 ) -> dict[str, Any]:
     name = _validate_pipeline_name(pipeline_name)
-    _validate_module_index(module_index)
+    validate_module_index(module_index)
     yaml_path = str(Path(pipelines_dir or get_jobs_dir()) / f"{name}.yaml")
     config = load_config(yaml_path)
 
-    asset = _find_pipeline_module_asset(config, "write_to_csv", module_index)
+    asset = find_module_asset_or_error(config, "write_to_csv", module_index)
 
     params = asset.get("params") if isinstance(asset, dict) else None
     if not isinstance(params, dict):
@@ -792,11 +767,11 @@ def get_transform_to_arcgis_format_data(
     module_index: int | None = None,
 ) -> dict[str, Any]:
     name = _validate_pipeline_name(pipeline_name)
-    _validate_module_index(module_index)
+    validate_module_index(module_index)
     yaml_path = str(Path(pipelines_dir or get_jobs_dir()) / f"{name}.yaml")
     config = load_config(yaml_path)
 
-    asset = _find_pipeline_module_asset(config, "transform_to_arcgis_format", module_index)
+    asset = find_module_asset_or_error(config, "transform_to_arcgis_format", module_index)
 
     params = asset.get("params") if isinstance(asset, dict) else None
     if not isinstance(params, dict):
@@ -813,11 +788,11 @@ def get_send_to_arcgis_data(
     pipeline_name: str, pipelines_dir: str | None = None, module_index: int | None = None
 ) -> dict[str, Any]:
     name = _validate_pipeline_name(pipeline_name)
-    _validate_module_index(module_index)
+    validate_module_index(module_index)
     yaml_path = str(Path(pipelines_dir or get_jobs_dir()) / f"{name}.yaml")
     config = load_config(yaml_path)
 
-    asset = _find_pipeline_module_asset(config, "send_to_arcgis", module_index)
+    asset = find_module_asset_or_error(config, "send_to_arcgis", module_index)
 
     params = asset.get("params") if isinstance(asset, dict) else None
     if not isinstance(params, dict):
@@ -844,7 +819,7 @@ def get_module_data(
     pipeline_name: str, module_name: str, module_index: int | None = None
 ) -> dict[str, Any]:
 
-    _validate_module_index(module_index)
+    validate_module_index(module_index)
 
     match module_name:
         case "http_get":
