@@ -545,7 +545,6 @@ const swapModule = async (index: number, value: unknown) => {
     const payload: SwapModulePayload = {
       targetModule,
       preserveCompatibleParams: true,
-      dryRun: false,
     };
     const response = await api.patch(
       `/pipelines/${pipelineName.value}/assets/${index}/module`,

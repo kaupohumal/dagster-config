@@ -175,31 +175,6 @@ class PipelineBuilderTests(unittest.TestCase):
             self.assertEqual(entries[1]["name"], "write_to_csv")
             self.assertEqual(entries[1]["index"], 1)
 
-    def test_swap_module_dry_run_does_not_persist(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            create_pipeline_from_modules(
-                pipeline_name="dry_run_pipeline",
-                module_specs=["http_get", "write_to_csv"],
-                pipelines_dir=tmpdir,
-            )
-
-            result = swap_module_for_pipeline_asset(
-                pipeline_name="dry_run_pipeline",
-                asset_index=1,
-                target_module_name="send_to_arcgis",
-                pipelines_dir=tmpdir,
-                dry_run=True,
-            )
-            self.assertTrue(result["ok"])
-            self.assertTrue(result["changed"])
-            self.assertTrue(result["dryRun"])
-
-            config = load_config(str(Path(tmpdir) / "dry_run_pipeline.yaml"))
-            assets = config["jobs"][0]["assets"]
-            self.assertEqual(assets[1]["module"], "write_to_csv")
-            resources = config.get("resources")
-            self.assertTrue(isinstance(resources, list) and len(resources) == 1)
-            self.assertEqual(resources[0].get("resource"), "MinIO")
 
     def test_swap_module_persists_and_adds_resource(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

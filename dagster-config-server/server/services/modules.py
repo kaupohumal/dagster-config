@@ -505,7 +505,6 @@ def swap_module_for_pipeline_asset(
     target_module_name: str,
     pipelines_dir: str | None = None,
     preserve_compatible_params: bool = True,
-    dry_run: bool = False,
 ) -> dict[str, Any]:
     name = _validate_pipeline_name(pipeline_name)
     index = _validate_asset_index(asset_index)
@@ -552,23 +551,21 @@ def swap_module_for_pipeline_asset(
         "addedResources": [],
     }
 
-    if not dry_run:
-        asset["module"] = target_module
-        if new_params:
-            asset["params"] = new_params
-        elif "params" in asset:
-            del asset["params"]
+    asset["module"] = target_module
+    if new_params:
+        asset["params"] = new_params
+    elif "params" in asset:
+        del asset["params"]
 
-        diagnostics["addedResources"].extend(
-            _ensure_required_resources_for_module(config, target_module)
-        )
+    diagnostics["addedResources"].extend(
+        _ensure_required_resources_for_module(config, target_module)
+    )
 
-        save_config(str(yaml_path), config)
+    save_config(str(yaml_path), config)
 
     return {
         "ok": True,
         "changed": True,
-        "dryRun": dry_run,
         "assetIndex": index,
         "previousModule": current_module,
         "module": target_module,

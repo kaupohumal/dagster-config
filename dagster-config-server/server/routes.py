@@ -220,7 +220,6 @@ def swap_pipeline_asset_module(pipeline_name: str, asset_index: int):
 
     target_module = payload.get("targetModule") if isinstance(payload, dict) else None
     preserve_compatible_params = bool(payload.get("preserveCompatibleParams", True))
-    dry_run = bool(payload.get("dryRun", False))
 
     try:
         result = swap_module_for_pipeline_asset(
@@ -228,7 +227,6 @@ def swap_pipeline_asset_module(pipeline_name: str, asset_index: int):
             asset_index=asset_index,
             target_module_name=target_module,
             preserve_compatible_params=preserve_compatible_params,
-            dry_run=dry_run,
         )
     except ValueError as e:
         return jsonify({"ok": False, "error": str(e)}), 400

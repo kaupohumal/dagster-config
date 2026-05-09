@@ -49,7 +49,6 @@ export interface PipelineSchedule {
 export interface SwapModulePayload {
   targetModule: string;
   preserveCompatibleParams?: boolean;
-  dryRun?: boolean;
 }
 
 export type HttpAuthType = 'none' | 'api_key' | 'basic_auth' | 'bearer_token';
