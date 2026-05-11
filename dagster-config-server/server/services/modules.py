@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from copy import deepcopy
 from pathlib import Path
 from typing import Any, TypedDict
@@ -278,6 +279,33 @@ def _normalize_http_get_auth(auth: object) -> dict[str, dict[str, Any]]:
             return {mode: normalized[mode]}
 
     return {}
+
+
+def _parse_http_get_pagination(check_more: object) -> dict[str, str] | None:
+    if not isinstance(check_more, dict):
+        return None
+
+    condition = check_more.get("condition")
+    parameter = check_more.get("parameter")
+    if not isinstance(condition, str) or not isinstance(parameter, str):
+        return None
+
+    match = re.match(r"^\s*0\s*!=\s*len\(\s*json_data\[(?P<path>[^\]]+)\]\s*\)\s*$", condition)
+    if not match:
+        return None
+
+    data_path = match.group("path").strip()
+    if data_path.startswith("'") and data_path.endswith("'") and len(data_path) >= 2:
+        data_path = data_path[1:-1].strip()
+    if data_path.startswith('"') and data_path.endswith('"') and len(data_path) >= 2:
+        data_path = data_path[1:-1].strip()
+    if not data_path:
+        return None
+
+    return {
+        "currentPageParameterName": parameter,
+        "responseDataPath": data_path,
+    }
 
 
 def _validate_asset_index(asset_index: int) -> int:
@@ -689,12 +717,14 @@ def get_http_get_data(
         value_field="value",
     )
     auth = _normalize_http_get_auth(params.get("auth"))
+    pagination = _parse_http_get_pagination(params.get("check_more"))
 
     return {
         "module": "http_get",
         "endpoint": endpoint,
         "params": params_list,
         "auth": auth,
+        "pagination": pagination,
     }
 
 

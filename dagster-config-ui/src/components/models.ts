@@ -93,6 +93,13 @@ export interface HttpAuthResponse {
   bearer_token?: HttpBearerTokenAuthResponse;
 }
 
+export interface HttpPaginationPayload {
+  currentPageParameterName: string;
+  responseDataPath: string;
+}
+
+export type HttpPaginationResponse = HttpPaginationPayload;
+
 export function createEmptyPair<K extends string, V extends string>(
   fields: PairFieldNames<K, V>,
 ): StringPair<K, V> {

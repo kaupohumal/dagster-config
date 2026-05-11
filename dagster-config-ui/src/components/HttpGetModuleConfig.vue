@@ -115,6 +115,28 @@
         class="q-mt-sm"
       />
     </div>
+    <div class="q-mt-lg">Pagination</div>
+    <div>
+      <q-toggle
+        v-model="paginationEnabled"
+        label="Enable pagination"
+        color="primary"
+      />
+    </div>
+    <div v-if="paginationEnabled">
+      <q-input
+        class="q-mt-sm"
+        label="Current page parameter name"
+        hint="Query parameter name used for the page number (e.g., currentPage)"
+        v-model="paginationCurrentPageParameterName"
+      />
+      <q-input
+        class="q-mt-sm"
+        label="Response data path"
+        hint="Key in the response JSON that contains the data array (e.g., events)"
+        v-model="paginationResponseDataPath"
+      />
+    </div>
     <q-btn
       @click="applyConfig"
       label="Save"
@@ -134,6 +156,8 @@ import {
   type HttpAuthPayload,
   type HttpAuthResponse,
   type HttpAuthType,
+  type HttpPaginationPayload,
+  type HttpPaginationResponse,
   normalizePairList,
   PARAMETER_FIELDS,
   type Parameter,
@@ -164,6 +188,9 @@ const bearerToken = ref<string>('');
 const apiKeySet = ref<boolean>(false);
 const basicPasswordSet = ref<boolean>(false);
 const bearerTokenSet = ref<boolean>(false);
+const paginationEnabled = ref<boolean>(false);
+const paginationCurrentPageParameterName = ref<string>('');
+const paginationResponseDataPath = ref<string>('');
 
 const clearAuthFields = () => {
   apiKey.value = '';
@@ -177,6 +204,11 @@ const clearSecretFlags = () => {
   apiKeySet.value = false;
   basicPasswordSet.value = false;
   bearerTokenSet.value = false;
+};
+
+const clearPaginationFields = () => {
+  paginationCurrentPageParameterName.value = '';
+  paginationResponseDataPath.value = '';
 };
 
 const normalizeAuthType = (rawAuth: unknown): HttpAuthType => {
@@ -226,6 +258,45 @@ const normalizeAuthType = (rawAuth: unknown): HttpAuthType => {
   clearAuthFields();
   clearSecretFlags();
   return 'none';
+};
+
+const applyPaginationConfig = (rawPagination: unknown) => {
+  if (typeof rawPagination !== 'object' || rawPagination === null) {
+    paginationEnabled.value = false;
+    clearPaginationFields();
+    return;
+  }
+
+  const pagination = rawPagination as HttpPaginationResponse;
+  const currentPageParameterName =
+    typeof pagination.currentPageParameterName === 'string'
+      ? pagination.currentPageParameterName
+      : '';
+  const responseDataPath =
+    typeof pagination.responseDataPath === 'string'
+      ? pagination.responseDataPath
+      : '';
+
+  paginationCurrentPageParameterName.value = currentPageParameterName;
+  paginationResponseDataPath.value = responseDataPath;
+  paginationEnabled.value = Boolean(currentPageParameterName.trim() && responseDataPath.trim());
+};
+
+const buildPaginationPayload = (): HttpPaginationPayload | null => {
+  if (!paginationEnabled.value) {
+    return null;
+  }
+
+  const currentPageParameterName = paginationCurrentPageParameterName.value.trim();
+  const responseDataPath = paginationResponseDataPath.value.trim();
+  if (!currentPageParameterName || !responseDataPath) {
+    return null;
+  }
+
+  return {
+    currentPageParameterName,
+    responseDataPath,
+  };
 };
 
 const buildAuthPayload = (): HttpAuthPayload => {
@@ -286,14 +357,27 @@ const getModuleConfig = async () => {
   moduleEndpoint.value = res.data['endpoint'];
   params.value = normalizePairList(res.data?.params, PARAMETER_FIELDS);
   authType.value = normalizeAuthType(res.data?.auth);
+  applyPaginationConfig(res.data?.pagination);
 }
 
 const applyConfig = async () => {
   try {
+    if (paginationEnabled.value) {
+      const paginationPayload = buildPaginationPayload();
+      if (!paginationPayload) {
+        $q.notify({
+          type: 'negative',
+          message: 'Pagination requires both fields to be set.',
+        });
+        return;
+      }
+    }
+
     await api.patch(apiEndpoint, {
       'endpoint': moduleEndpoint.value,
       'params': params.value,
       'auth': buildAuthPayload(),
+      'pagination': buildPaginationPayload(),
     });
 
     clearAuthFields();

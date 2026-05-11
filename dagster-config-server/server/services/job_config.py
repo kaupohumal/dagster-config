@@ -89,6 +89,24 @@ def _normalize_http_get_auth(
     return {"api_key": {"key": key_value, "key_name": key_name}}
 
 
+def _normalize_http_get_pagination(pagination_payload: object) -> dict[str, str] | None:
+    if pagination_payload is None:
+        return None
+    if not isinstance(pagination_payload, dict):
+        raise ValueError("pagination must be an object or null")
+
+    current_page = pagination_payload.get("currentPageParameterName")
+    response_data_path = pagination_payload.get("responseDataPath")
+
+    if not isinstance(current_page, str) or not current_page.strip():
+        raise ValueError("pagination.currentPageParameterName must be a non-empty string")
+    if not isinstance(response_data_path, str) or not response_data_path.strip():
+        raise ValueError("pagination.responseDataPath must be a non-empty string")
+
+    condition = f"0 != len(json_data['{response_data_path.strip()}'])"
+    return {"condition": condition, "parameter": current_page.strip()}
+
+
 def _update_http_get(data: dict[str, Any], payload: dict[str, Any], module_index: int | None) -> None:
     asset = find_module_asset_or_error(data, "http_get", module_index)
     params = asset.setdefault("params", {})
@@ -107,6 +125,12 @@ def _update_http_get(data: dict[str, Any], payload: dict[str, Any], module_index
         else:
             params.pop("auth", None)
 
+    if "pagination" in payload:
+        pagination = _normalize_http_get_pagination(payload.get("pagination"))
+        if pagination:
+            params["check_more"] = pagination
+        else:
+            params.pop("check_more", None)
 
 
 def _update_json_mapper(data: dict[str, Any], payload: dict[str, Any], module_index: int | None) -> None:
